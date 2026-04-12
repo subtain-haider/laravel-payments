@@ -37,8 +37,13 @@ class WebhookController extends Controller
         $payload = $request->all();
         $headers = $request->headers->all();
 
-        // Signature verification
-        if (! $driver->verifyWebhook($payload, $headers)) {
+        // Signature verification — use raw body when the gateway supports it (Fanbasis HMAC-SHA256).
+        // Per Fanbasis docs: "Never re-serialize the parsed JSON to generate or compare signatures"
+        $signatureValid = method_exists($driver, 'verifyWebhookSignature')
+            ? $driver->verifyWebhookSignature($request->getContent(), $headers)
+            : $driver->verifyWebhook($payload, $headers);
+
+        if (! $signatureValid) {
             PaymentLog::logWebhook(
                 paymentId: null,
                 gateway: $gateway,
@@ -48,7 +53,7 @@ class WebhookController extends Controller
                 status: 'rejected',
             );
 
-            return response()->json(['error' => 'Invalid webhook signature'], 403);
+            return response()->json(['error' => 'Invalid webhook signature'], 401);
         }
 
         // Parse into standardized result

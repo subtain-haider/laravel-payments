@@ -25,6 +25,14 @@ FANBASIS_WEBHOOK_SECRET=
 FANBASIS_CREATOR_HANDLE=          # required for embedded checkout
 ```
 
+### What You Need from Fanbasis
+
+1. **API Key** — go to your [FanBasis Dashboard → API Keys](https://www.fanbasis.com). Required for all API calls.
+2. **Webhook Secret** — returned once when you create a webhook subscription (via API or dashboard). Used for HMAC-SHA256 signature verification.
+3. **Creator Handle** — your FanBasis username/handle (visible in your profile URL). Only needed for embedded checkout URLs.
+
+That's it. No OAuth, no client ID/secret pairs, no separate sandbox keys — Fanbasis uses a single API key + separate test/live environments.
+
 ---
 
 ## Quick Start
@@ -97,7 +105,7 @@ Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
     productDescription: '$10K challenge',
     successUrl: 'https://app.com/success',
     webhookUrl: route('payments.webhook', 'fanbasis'),
-    metadata: ['invoice_id' => 'inv_123'],
+    metadata: ['invoice_id' => 'inv_123'],  // sent as api_metadata in webhooks
 ));
 ```
 
@@ -259,9 +267,30 @@ $fb->webhooks()->delete('ws_abc');
 $fb->webhooks()->test('ws_abc', ['event_type' => 'payment.succeeded']);
 ```
 
-### Webhook Signature Verification
+### Webhook Handling
 
-Automatic when `FANBASIS_WEBHOOK_SECRET` is set. Manual:
+The package handles all 12 Fanbasis webhook event types:
+
+| Event | Package Status |
+|---|---|
+| `payment.succeeded` | `PAID` |
+| `payment.failed` | `FAILED` |
+| `payment.expired` | `CANCELLED` |
+| `payment.canceled` | `CANCELLED` |
+| `product.purchased` | `PAID` |
+| `subscription.created` | `PAID` |
+| `subscription.renewed` | `PAID` |
+| `subscription.completed` | `CANCELLED` |
+| `subscription.canceled` | `CANCELLED` |
+| `refund.created` | `REFUNDED` |
+| `dispute.created` | `FAILED` |
+| `dispute.updated` | varies (`won`→PAID, `lost`→REFUNDED) |
+
+**Signature verification** is automatic when `FANBASIS_WEBHOOK_SECRET` is set. Uses HMAC-SHA256 on the raw request body per [Fanbasis docs](https://apidocs.fan/#webhooks).
+
+**Metadata round-trip:** Pass `metadata` in checkout → Fanbasis returns it as `api_metadata` in webhooks. The package handles this automatically — your `invoice_id` comes back in `$event->result->invoiceId`.
+
+Manual verification:
 
 ```php
 use Subtain\LaravelPayments\Gateways\Fanbasis\WebhooksService;
