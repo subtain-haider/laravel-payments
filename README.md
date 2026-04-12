@@ -1,8 +1,34 @@
 # Laravel Payments
 
-Multi-gateway payment SDK for Laravel. One interface for every gateway. Ships with **Fanbasis**, **PremiumPay**, and **Match2Pay**.
+A unified payment SDK for Laravel. Write your payment logic once — switch gateways without changing a line of application code.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+---
+
+## Why This Package?
+
+Every payment gateway has its own API, webhook format, and quirks. This package abstracts all of that behind a **single 3-method interface** so your application logic stays clean regardless of which PSP you use today or migrate to tomorrow.
+
+- **One interface for all gateways** — `checkout()`, `parseWebhook()`, `verifyWebhook()`
+- **Payment records** — `lp_payments` table tracks every attempt with polymorphic ownership
+- **Webhook handling** — automatic signature verification, status updates, event dispatch
+- **Status machine** — `pending → processing → paid → refunded` with guard rails
+- **Built-in discount codes** — gateway-agnostic, with usage limits, validity windows, and audit trail
+- **Extensible** — add any PSP in 3 steps (implement interface, register in config, use it)
+
+---
+
+## Supported Gateways
+
+| Gateway | Type | Checkout | Webhooks | Full API | Docs |
+|---|---|---|---|---|---|
+| **[Fanbasis](docs/gateways/fanbasis.md)** | Cards, MoR | Dynamic, Embedded, Static, Subscriptions | 12 event types, HMAC-SHA256 | Customers, Subscribers, Discount Codes, Products, Transactions, Refunds, Webhooks | [Full docs →](docs/gateways/fanbasis.md) |
+| **PremiumPay** | Cards | API checkout | Callback-based | Checkout only | See below |
+| **Match2Pay** | Crypto (USDT, BTC, etc.) | API checkout | SHA-384 signature | Checkout only | See below |
+| *Your gateway* | *Any* | *Implement `PaymentGateway`* | *Your logic* | *Your logic* | [Add a gateway →](#add-a-custom-gateway) |
+
+> More PSPs are coming. Each gateway gets a full dedicated implementation as we add it. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -15,34 +41,25 @@ php artisan vendor:publish --tag=payments-migrations
 php artisan migrate
 ```
 
-## Environment
-
-```env
-PAYMENT_GATEWAY=fanbasis
-
-FANBASIS_API_KEY=
-FANBASIS_WEBHOOK_SECRET=
-FANBASIS_CREATOR_HANDLE=          # required for embedded checkout
-```
-
-### What You Need from Fanbasis
-
-1. **API Key** — go to your [FanBasis Dashboard → API Keys](https://www.fanbasis.com). Required for all API calls.
-2. **Webhook Secret** — returned once when you create a webhook subscription (via API or dashboard). Used for HMAC-SHA256 signature verification.
-3. **Creator Handle** — your FanBasis username/handle (visible in your profile URL). Only needed for embedded checkout URLs.
-
-That's it. No OAuth, no client ID/secret pairs, no separate sandbox keys — Fanbasis uses a single API key + separate test/live environments.
-
----
-
 ## Quick Start
 
-### Checkout (with DB record)
+### 1. Set your gateway credentials
+
+```env
+PAYMENT_GATEWAY=fanbasis          # or premiumpay, match2pay, your-custom-gateway
+
+# Each gateway has its own env vars — see the gateway docs
+FANBASIS_API_KEY=your-key
+FANBASIS_WEBHOOK_SECRET=your-secret
+```
+
+### 2. Create a checkout
 
 ```php
 use Subtain\LaravelPayments\PaymentService;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 
+// With DB tracking (recommended)
 $result = app(PaymentService::class)->initiate('fanbasis', new CheckoutRequest(
     amount: 299.00,
     productName: 'Pro Plan',
@@ -54,11 +71,10 @@ $result = app(PaymentService::class)->initiate('fanbasis', new CheckoutRequest(
 return redirect($result->redirectUrl);
 ```
 
-### Checkout (no DB)
-
 ```php
 use Subtain\LaravelPayments\Facades\Payment;
 
+// Lightweight (no DB record)
 $result = Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
     amount: 299.00,
     productName: 'Pro Plan',
@@ -66,15 +82,18 @@ $result = Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
 ));
 ```
 
-### Webhooks
+### 3. Handle webhooks
 
-Handled automatically at `POST /payments/webhook/{gateway}`. The package verifies the signature, updates payment status, and dispatches events.
+Webhooks are handled automatically at `POST /payments/webhook/{gateway}`. The package verifies the signature, updates payment status, and dispatches events.
 
 ```php
 // EventServiceProvider
 protected $listen = [
     \Subtain\LaravelPayments\Events\PaymentSucceeded::class => [
         \App\Listeners\FulfillOrder::class,
+    ],
+    \Subtain\LaravelPayments\Events\PaymentFailed::class => [
+        \App\Listeners\NotifyCustomer::class,
     ],
 ];
 ```
@@ -84,221 +103,98 @@ class FulfillOrder
 {
     public function handle(PaymentSucceeded $event): void
     {
-        $invoiceId = $event->result->invoiceId; // from metadata['invoice_id']
-        $payment   = $event->payment;           // Payment model (nullable)
+        $invoiceId = $event->result->invoiceId;  // from your metadata
+        $payment   = $event->payment;            // Payment model (nullable)
     }
 }
 ```
 
 ---
 
-## Fanbasis Gateway
+## Gateway Quick Reference
 
-Full Fanbasis API coverage: checkout, customers, subscribers, discount codes, products, transactions, refunds, and webhooks.
+### Fanbasis
 
-### One-Time Checkout
+Full API integration — one-time, subscriptions, embedded checkout, discount codes, customers, refunds, and more.
 
 ```php
 Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
     amount: 299.00,
-    productName: 'Funded Account',
-    productDescription: '$10K challenge',
+    productName: 'Pro Plan',
+    webhookUrl: route('payments.webhook', 'fanbasis'),
+));
+```
+
+**[→ Full Fanbasis documentation](docs/gateways/fanbasis.md)** — checkout modes, subscriptions, embedded checkout, full API access, webhook event reference.
+
+### PremiumPay
+
+```php
+Payment::gateway('premiumpay')->checkout(new CheckoutRequest(
+    amount: 99.00,
+    invoiceId: 'inv_456',
+    customerEmail: 'user@example.com',
+    customerIp: request()->ip(),
+    productName: 'Starter Package',
     successUrl: 'https://app.com/success',
-    webhookUrl: route('payments.webhook', 'fanbasis'),
-    metadata: ['invoice_id' => 'inv_123'],  // sent as api_metadata in webhooks
+    webhookUrl: route('payments.webhook', 'premiumpay'),
 ));
 ```
 
-### Subscription Checkout
+### Match2Pay (Crypto)
 
 ```php
-Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
-    amount: 29.99,
-    productName: 'Pro Monthly',
-    webhookUrl: route('payments.webhook', 'fanbasis'),
-    extra: [
-        'subscription' => [
-            'frequency_days'  => 30,
-            'free_trial_days' => 7,
-        ],
-    ],
+Payment::gateway('match2pay')->checkout(new CheckoutRequest(
+    amount: 50.00,
+    webhookUrl: route('payments.webhook', 'match2pay'),
+    extra: ['payment_currency' => 'USX', 'payment_gateway_name' => 'USDT TRC20'],
 ));
 ```
 
-### Embedded Checkout (iframe)
+---
+
+## Core Features
+
+### Payment Model
 
 ```php
-$result = Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
-    amount: 0,
-    extra: [
-        'embedded'   => true,
-        'product_id' => 'NLxj6',
-    ],
-));
-// $result->redirectUrl → https://embedded.fanbasis.io/session/{handle}/{id}/{secret}
+use Subtain\LaravelPayments\Models\Payment;
+
+$payment = Payment::findByInvoiceId('inv_123');
+$payment->isPaid();
+$payment->markAsPaid('txn_abc');
+$payment->markAsRefunded();
+$payment->payable;  // polymorphic owner (Order, User, etc.)
+$payment->logs;     // webhook audit trail
 ```
 
-### Static Payment Link
+### Status Machine
+
+```
+pending → processing → paid → refunded
+pending → failed → pending (retry)
+pending → cancelled (terminal)
+```
+
+### HasPayments Trait
 
 ```php
-Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
-    amount: 0,
-    extra: ['payment_link' => 'https://fanbasis.com/pay/your-link'],
-    metadata: ['user_id' => '42'], // appended as query params
-));
+use Subtain\LaravelPayments\Traits\HasPayments;
+
+class Order extends Model { use HasPayments; }
+
+$order->payments;
+$order->hasPaidPayment();
+$order->latestPayment();
 ```
 
-### Fanbasis Discount Codes (Gateway-Level)
+### Events
 
-```php
-// Pre-apply a Fanbasis discount code at checkout
-Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
-    amount: 299.00,
-    productName: 'Pro Plan',
-    extra: ['discount_code' => 'SUMMER20'],
-));
-
-// Let customer enter their own Fanbasis code on checkout page
-Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
-    amount: 299.00,
-    productName: 'Pro Plan',
-    extra: ['allow_discount_codes' => true],
-));
-```
-
-> **Note:** Fanbasis discount codes are scoped to specific products via `service_ids` and managed through the Fanbasis API. For a **gateway-agnostic** discount code system that you control, see [Built-in Discount Codes](#built-in-discount-codes) below.
-
-### Full API Access
-
-```php
-$fb = Payment::gateway('fanbasis');
-```
-
-#### Checkout Sessions
-
-```php
-$fb->checkoutSessions()->create([
-    'product'      => ['title' => 'Pro Plan'],
-    'amount_cents' => 29900,
-    'type'         => 'onetime_non_reusable',
-    'success_url'  => 'https://app.com/success',
-]);
-$fb->checkoutSessions()->find('NLxj6');
-$fb->checkoutSessions()->delete('NLxj6');
-$fb->checkoutSessions()->transactions('NLxj6');
-$fb->checkoutSessions()->createEmbedded(['product_id' => 'NLxj6']);
-$fb->checkoutSessions()->subscriptions('NLxj6');
-$fb->checkoutSessions()->cancelSubscription('NLxj6', 'sub_1');
-$fb->checkoutSessions()->extendSubscription('NLxj6', [
-    'user_id' => 'usr_1', 'duration_days' => 30,
-]);
-$fb->checkoutSessions()->refundTransaction('txn_1', ['amount_cents' => 1500]);
-```
-
-#### Customers
-
-```php
-$fb->customers()->list(['search' => 'jane@example.com']);
-$fb->customers()->paymentMethods('cust_1');
-$fb->customers()->charge('cust_1', [
-    'payment_method_id' => 'pm_abc',
-    'amount_cents'      => 1999,
-    'description'       => 'Upgrade charge',
-]);
-```
-
-#### Subscribers
-
-```php
-$fb->subscribers()->list(['status' => 'active']);
-$fb->subscribers()->forCheckoutSession('NLxj6');
-$fb->subscribers()->forProduct('prod_1');
-$fb->subscribers()->cancel('NLxj6', 'sub_1');
-$fb->subscribers()->extend('NLxj6', ['user_id' => 'usr_1', 'duration_days' => 30]);
-$fb->subscribers()->refundTransaction('txn_1');
-```
-
-#### Discount Codes
-
-```php
-$fb->discountCodes()->list();
-$fb->discountCodes()->create([
-    'code'          => 'SUMMER20',
-    'discount_type' => 'percentage',  // or 'fixed'
-    'value'         => 20,
-    'duration'      => 'once',        // once, forever, multiple_months
-    'expiry'        => '2026-12-31',
-    'one_time'      => true,
-    'service_ids'   => [101, 102],
-]);
-$fb->discountCodes()->find(1);
-$fb->discountCodes()->update(1, ['expiry' => '2027-06-30']);
-$fb->discountCodes()->delete(1);
-```
-
-#### Products
-
-```php
-$fb->products()->list(['page' => 1, 'per_page' => 20]);
-```
-
-#### Transactions
-
-```php
-$fb->transactions()->find('txn_abc');
-$fb->transactions()->list(['product_id' => 'NLxj6']);
-```
-
-#### Refunds
-
-```php
-$fb->refunds()->create('txn_abc');                          // full
-$fb->refunds()->create('txn_abc', ['amount' => 1500]);     // partial
-$fb->refunds()->create('txn_abc', ['reason' => 'Unused']); // with reason
-```
-
-#### Webhooks Management
-
-```php
-$fb->webhooks()->list();
-$fb->webhooks()->create([
-    'webhook_url'  => 'https://app.com/webhooks/fanbasis',
-    'event_types'  => ['payment.succeeded', 'subscription.created'],
-]);
-$fb->webhooks()->delete('ws_abc');
-$fb->webhooks()->test('ws_abc', ['event_type' => 'payment.succeeded']);
-```
-
-### Webhook Handling
-
-The package handles all 12 Fanbasis webhook event types:
-
-| Event | Package Status |
+| Event | Trigger |
 |---|---|
-| `payment.succeeded` | `PAID` |
-| `payment.failed` | `FAILED` |
-| `payment.expired` | `CANCELLED` |
-| `payment.canceled` | `CANCELLED` |
-| `product.purchased` | `PAID` |
-| `subscription.created` | `PAID` |
-| `subscription.renewed` | `PAID` |
-| `subscription.completed` | `CANCELLED` |
-| `subscription.canceled` | `CANCELLED` |
-| `refund.created` | `REFUNDED` |
-| `dispute.created` | `FAILED` |
-| `dispute.updated` | varies (`won`→PAID, `lost`→REFUNDED) |
-
-**Signature verification** is automatic when `FANBASIS_WEBHOOK_SECRET` is set. Uses HMAC-SHA256 on the raw request body per [Fanbasis docs](https://apidocs.fan/#webhooks).
-
-**Metadata round-trip:** Pass `metadata` in checkout → Fanbasis returns it as `api_metadata` in webhooks. The package handles this automatically — your `invoice_id` comes back in `$event->result->invoiceId`.
-
-Manual verification:
-
-```php
-use Subtain\LaravelPayments\Gateways\Fanbasis\WebhooksService;
-
-WebhooksService::verifySignature($request->getContent(), $request->header('x-webhook-signature'), $secret);
-```
+| `PaymentSucceeded` | Payment confirmed |
+| `PaymentFailed` | Payment failed |
+| `WebhookReceived` | Any webhook (all statuses) |
 
 ---
 
@@ -572,70 +468,7 @@ class AppDiscountCode extends \Subtain\LaravelPayments\Models\DiscountCode
 
 ---
 
-## Other Gateways
-
-### PremiumPay
-
-```php
-Payment::gateway('premiumpay')->checkout(new CheckoutRequest(
-    amount: 99.00,
-    invoiceId: 'inv_456',
-    customerEmail: 'user@example.com',
-    customerIp: request()->ip(),
-    productName: 'Starter Package',
-    successUrl: 'https://app.com/success',
-    webhookUrl: route('payments.webhook', 'premiumpay'),
-));
-```
-
-### Match2Pay (Crypto)
-
-```php
-Payment::gateway('match2pay')->checkout(new CheckoutRequest(
-    amount: 50.00,
-    webhookUrl: route('payments.webhook', 'match2pay'),
-    extra: ['payment_currency' => 'USX', 'payment_gateway_name' => 'USDT TRC20'],
-));
-```
-
----
-
-## Payment Model
-
-```php
-use Subtain\LaravelPayments\Models\Payment;
-
-$payment = Payment::findByInvoiceId('inv_123');
-$payment->isPaid();
-$payment->markAsPaid('txn_abc');
-$payment->markAsRefunded();
-$payment->payable;  // polymorphic owner
-$payment->logs;     // webhook audit trail
-```
-
-### Status Machine
-
-```
-pending → processing → paid → refunded
-pending → failed → pending (retry)
-pending → cancelled (terminal)
-```
-
-## HasPayments Trait
-
-```php
-use Subtain\LaravelPayments\Traits\HasPayments;
-
-class Order extends Model { use HasPayments; }
-
-$order->payments;
-$order->hasPaidPayment();
-$order->latestPayment();
-```
-
----
-
-## Custom Gateway
+## Add a Custom Gateway
 
 ```php
 // 1. Implement the interface
@@ -658,14 +491,6 @@ Payment::gateway('stripe')->checkout($request);
 ```
 
 ---
-
-## Events
-
-| Event | Trigger |
-|---|---|
-| `PaymentSucceeded` | Payment confirmed |
-| `PaymentFailed` | Payment failed |
-| `WebhookReceived` | Any webhook (all statuses) |
 
 ## Testing
 
