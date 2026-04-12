@@ -1,0 +1,59 @@
+{
+    "name": "subtain/laravel-payments",
+    "description": "A clean, extensible multi-gateway payment package for Laravel. Supports Fanbasis, PremiumPay, Match2Pay out of the box — and any custom gateway you build.",
+    "keywords": [
+        "laravel",
+        "payments",
+        "payment-gateway",
+        "fanbasis",
+        "premiumpay",
+        "match2pay",
+        "checkout",
+        "webhooks"
+    ],
+    "homepage": "https://github.com/subtain-haider/laravel-payments",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Syed Subtain Haider",
+            "email": "mail@syedsubtain.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/contracts": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/routing": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Subtain\\LaravelPayments\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Subtain\\LaravelPayments\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Subtain\\LaravelPayments\\PaymentServiceProvider"
+            ],
+            "aliases": {
+                "Payment": "Subtain\\LaravelPayments\\Facades\\Payment"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
