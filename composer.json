@@ -53,6 +53,11 @@
             }
         }
     },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "format": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php",
+        "analyse": "vendor/bin/phpstan analyse"
+    },
     "config": {
         "sort-packages": true
     },
