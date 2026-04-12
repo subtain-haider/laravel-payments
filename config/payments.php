@@ -42,6 +42,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Database Tables
+    |--------------------------------------------------------------------------
+    |
+    | Customize the table names used by the package. Useful if your app
+    | already has a 'payments' table or you prefer a different naming
+    | convention.
+    |
+    */
+
+    'tables' => [
+        'payments'     => 'lp_payments',
+        'payment_logs' => 'lp_payment_logs',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Payment Gateways
     |--------------------------------------------------------------------------
     |

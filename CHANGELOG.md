@@ -2,6 +2,27 @@
 
 All notable changes to `laravel-payments` will be documented in this file.
 
+## 2.0.0 — 2026-04-12
+
+### Added
+- **`Payment` model** — Eloquent model with polymorphic `payable` relationship, tracks every payment attempt
+- **`PaymentLog` model** — audit trail for every webhook received, status change, and checkout initiation
+- **`PaymentService`** — high-level orchestration: `initiate()` creates DB record → calls gateway → updates record
+- **`HasPayments` trait** — add to any model to get `$model->payments()`, `$model->hasPaidPayment()`, etc.
+- **Status machine** — `Payment::transitionTo()` with guard rails preventing invalid transitions (e.g. paid → pending)
+- **`PROCESSING` status** — new status for after checkout initiation, before gateway confirmation
+- **Database migrations** — publishable via `php artisan vendor:publish --tag=payments-migrations`
+- **Configurable table names** — defaults to `lp_payments` and `lp_payment_logs` (prefixed to avoid conflicts)
+- **Auto webhook processing** — `WebhookController` now finds payment record, updates status, logs payload automatically
+- **Idempotent webhooks** — duplicate webhooks for same status are silently skipped
+- **Invalid transition logging** — logged to `lp_payment_logs` instead of throwing errors during webhook processing
+- Events now include optional `$payment` model: `$event->payment` (null if not using DB tracking)
+
+### Changed
+- `illuminate/database` added as a required dependency
+- `WebhookController` now writes to `lp_payment_logs` and updates `lp_payments` table automatically
+- All three events (`PaymentSucceeded`, `PaymentFailed`, `WebhookReceived`) accept optional `Payment` model as second argument
+
 ## 1.0.0 — 2024-04-12
 
 ### Added

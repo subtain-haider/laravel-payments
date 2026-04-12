@@ -23,6 +23,8 @@ class PaymentServiceProvider extends ServiceProvider
         $this->app->bind(PaymentGateway::class, function ($app) {
             return $app->make('payment')->gateway();
         });
+
+        $this->app->singleton(PaymentService::class);
     }
 
     /**
@@ -34,6 +36,14 @@ class PaymentServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../config/payments.php' => config_path('payments.php'),
         ], 'payments-config');
+
+        // Publish migrations
+        $this->publishes([
+            __DIR__ . '/../database/migrations/create_payments_table.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time()) . '_create_payments_table.php'),
+            __DIR__ . '/../database/migrations/create_payment_logs_table.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time() + 1) . '_create_payment_logs_table.php'),
+        ], 'payments-migrations');
 
         // Load webhook routes
         $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');

@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create(config('payments.tables.payment_logs', 'lp_payment_logs'), function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('payment_id')
+                ->nullable()
+                ->constrained(config('payments.tables.payments', 'lp_payments'))
+                ->nullOnDelete();
+
+            $table->string('gateway');
+            $table->string('event');            // webhook_received, status_changed, checkout_initiated, etc.
+            $table->string('status')->nullable();
+            $table->json('payload')->nullable();
+            $table->json('headers')->nullable();
+            $table->json('metadata')->nullable();
+
+            $table->timestamps();
+
+            // Indexes
+            $table->index('gateway');
+            $table->index('event');
+            $table->index('payment_id');
+            $table->index('created_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(config('payments.tables.payment_logs', 'lp_payment_logs'));
+    }
+};
