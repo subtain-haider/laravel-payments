@@ -148,23 +148,25 @@ Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
 ));
 ```
 
-### Discount Codes
+### Fanbasis Discount Codes (Gateway-Level)
 
 ```php
-// Pre-apply a code at checkout
+// Pre-apply a Fanbasis discount code at checkout
 Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
     amount: 299.00,
     productName: 'Pro Plan',
     extra: ['discount_code' => 'SUMMER20'],
 ));
 
-// Let customer enter their own code
+// Let customer enter their own Fanbasis code on checkout page
 Payment::gateway('fanbasis')->checkout(new CheckoutRequest(
     amount: 299.00,
     productName: 'Pro Plan',
     extra: ['allow_discount_codes' => true],
 ));
 ```
+
+> **Note:** Fanbasis discount codes are scoped to specific products via `service_ids` and managed through the Fanbasis API. For a **gateway-agnostic** discount code system that you control, see [Built-in Discount Codes](#built-in-discount-codes) below.
 
 ### Full API Access
 
@@ -296,6 +298,276 @@ Manual verification:
 use Subtain\LaravelPayments\Gateways\Fanbasis\WebhooksService;
 
 WebhooksService::verifySignature($request->getContent(), $request->header('x-webhook-signature'), $secret);
+```
+
+---
+
+## Built-in Discount Codes
+
+A gateway-agnostic discount code system that lives in your database. You control the codes, validation, and limits — the payment gateway just receives the final discounted amount.
+
+### Publish Migrations
+
+```bash
+php artisan vendor:publish --tag=payments-migrations
+php artisan migrate
+```
+
+This creates two tables (names configurable in `config/payments.php`):
+
+| Table | Purpose |
+|---|---|
+| `lp_discount_codes` | Discount code definitions |
+| `lp_discount_code_usages` | Usage audit trail (who used what, when, amounts) |
+
+### Creating Discount Codes
+
+```php
+use Subtain\LaravelPayments\Models\DiscountCode;
+
+// 99% off, unlimited uses (testing)
+DiscountCode::create([
+    'code'        => 'TEST99',
+    'description' => 'Internal testing code',
+    'type'        => 'percentage',
+    'value'       => 99,
+]);
+
+// $50 off, max 100 total uses, one per user
+DiscountCode::create([
+    'code'               => 'LAUNCH50',
+    'description'        => 'Launch promo — $50 off',
+    'type'               => 'fixed',
+    'value'              => 50,
+    'max_total_uses'     => 100,
+    'max_uses_per_user'  => 1,
+    'expires_at'         => '2026-12-31 23:59:59',
+]);
+
+// 20% off (max $500 savings), valid only this week
+DiscountCode::create([
+    'code'                => 'FLASH20',
+    'type'                => 'percentage',
+    'value'               => 20,
+    'max_discount_amount' => 500,
+    'starts_at'           => '2026-04-14 00:00:00',
+    'expires_at'          => '2026-04-20 23:59:59',
+]);
+
+// $10 off, minimum $100 order
+DiscountCode::create([
+    'code'             => 'SAVE10',
+    'type'             => 'fixed',
+    'value'            => 10,
+    'min_order_amount' => 100,
+]);
+
+// 15% off, only for Fanbasis payments
+DiscountCode::create([
+    'code'     => 'FANBASIS15',
+    'type'     => 'percentage',
+    'value'    => 15,
+    'gateways' => ['fanbasis'],
+]);
+
+// $25 off, valid for Fanbasis and PremiumPay only
+DiscountCode::create([
+    'code'     => 'MULTI25',
+    'type'     => 'fixed',
+    'value'    => 25,
+    'gateways' => ['fanbasis', 'premiumpay'],
+]);
+```
+
+### All Discount Code Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `code` | string, unique | required | The code customers enter |
+| `description` | string, nullable | null | Internal note |
+| `type` | `percentage` or `fixed` | required | Discount type |
+| `value` | decimal | required | 20 = 20% off or $20 off |
+| `min_order_amount` | decimal, nullable | null (no min) | Minimum order to apply |
+| `max_discount_amount` | decimal, nullable | null (no cap) | Cap on savings |
+| `max_total_uses` | int, nullable | null (unlimited) | Global redemption limit |
+| `max_uses_per_user` | int, nullable | null (unlimited) | Per-user redemption limit |
+| `times_used` | int | 0 | Auto-incremented counter |
+| `starts_at` | timestamp, nullable | null (immediate) | Not valid before this |
+| `expires_at` | timestamp, nullable | null (never) | Not valid after this |
+| `gateways` | JSON array, nullable | null (all gateways) | Restrict to specific gateways (e.g. `["fanbasis"]`) |
+| `active` | bool | true | On/off toggle |
+
+### Validating a Code
+
+```php
+use Subtain\LaravelPayments\DiscountService;
+
+$discountService = app(DiscountService::class);
+
+// Throws ValidationException with specific message if invalid
+$discountCode = $discountService->validate(
+    code: 'LAUNCH50',
+    amount: 299.00,
+    userId: $user->id,   // optional, for per-user limits
+    gateway: 'fanbasis', // optional, for gateway-scoped codes
+);
+```
+
+Validation checks (in order):
+1. Code exists
+2. Code is active
+3. Not before `starts_at`
+4. Not after `expires_at`
+5. Not exceeded `max_total_uses`
+6. Order amount >= `min_order_amount`
+7. Gateway is in `gateways` list (if set)
+8. User hasn't exceeded `max_uses_per_user`
+
+### Applying a Code (Validate + Calculate)
+
+```php
+$result = $discountService->apply(
+    code: 'LAUNCH50',
+    amount: 299.00,
+    userId: $user->id,
+    gateway: 'fanbasis',  // optional
+);
+
+$result->discountCode;   // DiscountCode model
+$result->originalAmount; // 299.00
+$result->discountAmount; // 50.00
+$result->finalAmount;    // 249.00
+$result->toArray();      // ['discount_code' => 'LAUNCH50', 'discount_type' => 'fixed', ...]
+```
+
+### Recording Usage (After Payment)
+
+Call this after the payment succeeds (e.g. in your order fulfillment listener):
+
+```php
+$discountService->recordUsage(
+    result: $result,
+    userId: $user->id,
+    payable: $order,  // any Eloquent model (polymorphic)
+);
+```
+
+This increments `times_used` on the discount code and creates an audit trail record in `lp_discount_code_usages`.
+
+### Full Checkout Flow Example
+
+```php
+use Subtain\LaravelPayments\DiscountService;
+use Subtain\LaravelPayments\PaymentService;
+use Subtain\LaravelPayments\DTOs\CheckoutRequest;
+
+// 1. Determine price
+$amount = $challenge->price;  // 299.00
+$discountResult = null;
+
+if ($discountCode = $request->input('discount_code')) {
+    $discountResult = app(DiscountService::class)->apply(
+        code: $discountCode,
+        amount: $amount,
+        userId: auth()->id(),
+    );
+    $amount = $discountResult->finalAmount;  // 249.00
+}
+
+// 2. Create order with discounted amount
+$order = Order::create(['amount' => $amount, ...]);
+
+// 3. Initiate payment with final amount
+$result = app(PaymentService::class)->initiate('fanbasis', new CheckoutRequest(
+    amount: $amount,
+    productName: $challenge->name,
+    metadata: [
+        'invoice_id'    => (string) $order->id,
+        'discount_code' => $discountCode,
+    ],
+    webhookUrl: route('payments.webhook', 'fanbasis'),
+    successUrl: $redirectUrl,
+), $order);
+
+// 4. After payment succeeds (in listener), record usage
+if ($discountResult) {
+    app(DiscountService::class)->recordUsage(
+        result: $discountResult,
+        userId: $user->id,
+        payable: $order,
+    );
+}
+```
+
+### Validation Rule
+
+Use in Form Requests to validate the discount code as part of the request:
+
+```php
+use Subtain\LaravelPayments\Rules\ValidDiscountCode;
+
+public function rules(): array
+{
+    return [
+        'discount_code' => ['nullable', 'string', new ValidDiscountCode(
+            userId: $this->user()?->id,
+            amount: 299.00,      // or resolve dynamically
+            gateway: 'fanbasis', // optional, for gateway-scoped codes
+        )],
+    ];
+}
+```
+
+### Model API
+
+```php
+use Subtain\LaravelPayments\Models\DiscountCode;
+
+// Find by code (case-insensitive)
+$code = DiscountCode::findByCode('LAUNCH50');
+
+// Check redeemability (returns true or error string)
+$result = $code->redeemable(userId: 42, amount: 299.00);
+if ($result !== true) {
+    echo $result; // "Discount code has expired."
+}
+
+// Boolean shortcut
+$code->isRedeemable(userId: 42, amount: 299.00);
+
+// Calculate discount amount
+$code->calculateDiscount(299.00); // 50.00
+
+// Query scope — only valid codes
+DiscountCode::valid()->get();
+
+// Relationships
+$code->usages;  // Collection of DiscountCodeUsage
+$code->usages()->where('user_id', 42)->count();
+```
+
+### Extending with App-Specific Scoping
+
+The package handles generic discount logic. If your app needs **product/challenge-specific** or **user-group-specific** codes, extend the model:
+
+```php
+// In your app
+class AppDiscountCode extends \Subtain\LaravelPayments\Models\DiscountCode
+{
+    public function challenges()
+    {
+        return $this->belongsToMany(Challenge::class, 'discount_code_challenge');
+    }
+
+    public function redeemable(?int $userId = null, ?float $amount = null): true|string
+    {
+        $base = parent::redeemable($userId, $amount);
+        if ($base !== true) return $base;
+
+        // Add your custom checks here
+        return true;
+    }
+}
 ```
 
 ---

@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.1.0 — Built-in Discount Codes
+
+### Added
+- **`DiscountCode` model** — percentage or fixed discounts with: min order amount, max discount cap, total/per-user usage limits, start/expiry dates, active toggle, soft deletes
+- **`DiscountCodeUsage` model** — polymorphic audit trail recording who used what code on which payable, with original/discount/final amounts
+- **`DiscountService`** — `validate()`, `apply()`, `recordUsage()` for complete discount lifecycle
+- **`DiscountResult` DTO** — immutable result of applying a discount (original, discount, final amounts)
+- **Gateway scoping** — optional `gateways` JSON field to restrict codes to specific payment providers (null = all)
+- **`ValidDiscountCode` validation rule** — drop-in Laravel validation rule for Form Requests
+- **`DiscountType` enum** — `percentage`, `fixed`
+- Two new publishable migration stubs: `create_discount_codes_table`, `create_discount_code_usages_table`
+- Config keys: `tables.discount_codes`, `tables.discount_code_usages`
+- Comprehensive README documentation with all fields, usage examples, validation flow, and extension guide
+
+### Changed
+- `PaymentServiceProvider` now registers `DiscountService` as singleton
+- Migration publish includes discount tables alongside payment tables
+
 ## v3.0.0 — Fanbasis Full API Integration
 
 ### Added

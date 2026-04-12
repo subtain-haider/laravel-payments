@@ -26,6 +26,7 @@ class PaymentServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(PaymentService::class);
+        $this->app->singleton(DiscountService::class);
 
         // Register FanbasisClient as a singleton for direct DI usage
         $this->app->singleton(FanbasisClient::class, function ($app) {
@@ -51,6 +52,10 @@ class PaymentServiceProvider extends ServiceProvider
                 => database_path('migrations/' . date('Y_m_d_His', time()) . '_create_payments_table.php'),
             __DIR__ . '/../database/migrations/create_payment_logs_table.php.stub'
                 => database_path('migrations/' . date('Y_m_d_His', time() + 1) . '_create_payment_logs_table.php'),
+            __DIR__ . '/../database/migrations/create_discount_codes_table.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time() + 2) . '_create_discount_codes_table.php'),
+            __DIR__ . '/../database/migrations/create_discount_code_usages_table.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time() + 3) . '_create_discount_code_usages_table.php'),
         ], 'payments-migrations');
 
         // Load webhook routes

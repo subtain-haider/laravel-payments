@@ -52,8 +52,10 @@ return [
     */
 
     'tables' => [
-        'payments'     => 'lp_payments',
-        'payment_logs' => 'lp_payment_logs',
+        'payments'             => 'lp_payments',
+        'payment_logs'         => 'lp_payment_logs',
+        'discount_codes'       => 'lp_discount_codes',
+        'discount_code_usages' => 'lp_discount_code_usages',
     ],
 
     /*
