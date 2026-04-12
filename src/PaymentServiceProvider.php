@@ -4,6 +4,7 @@ namespace Subtain\LaravelPayments;
 
 use Illuminate\Support\ServiceProvider;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
+use Subtain\LaravelPayments\Gateways\Fanbasis\FanbasisClient;
 
 class PaymentServiceProvider extends ServiceProvider
 {
@@ -25,6 +26,13 @@ class PaymentServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(PaymentService::class);
+
+        // Register FanbasisClient as a singleton for direct DI usage
+        $this->app->singleton(FanbasisClient::class, function ($app) {
+            $config = $app['config']->get('payments.gateways.fanbasis', []);
+
+            return new FanbasisClient($config);
+        });
     }
 
     /**

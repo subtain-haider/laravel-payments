@@ -74,9 +74,13 @@ return [
     'gateways' => [
 
         'fanbasis' => [
-            'driver'   => \Subtain\LaravelPayments\Gateways\FanbasisGateway::class,
-            'base_url' => env('FANBASIS_BASE_URL', 'https://www.fanbasis.com/public-api'),
-            'api_key'  => env('FANBASIS_API_KEY'),
+            'driver'         => \Subtain\LaravelPayments\Gateways\FanbasisGateway::class,
+            'base_url'       => env('FANBASIS_BASE_URL', 'https://www.fanbasis.com/public-api'),
+            'api_key'        => env('FANBASIS_API_KEY'),
+            'webhook_secret' => env('FANBASIS_WEBHOOK_SECRET'),
+            'creator_handle' => env('FANBASIS_CREATOR_HANDLE'),
+            'timeout'        => (int) env('FANBASIS_TIMEOUT', 30),
+            'retries'        => (int) env('FANBASIS_RETRIES', 2),
         ],
 
         'premiumpay' => [

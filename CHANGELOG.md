@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.0.0 — Fanbasis Full API Integration
+
+### Added
+- **3 checkout modes**: Dynamic (API), Embedded (iframe), Static (pre-built link)
+- **Subscription checkout**: `frequency_days`, `free_trial_days`, `auto_expire_after_x_periods`
+- **Discount codes on checkout**: `discount_code` (pre-applied) and `allow_discount_codes` (customer input)
+- **Full Fanbasis API services**: `checkoutSessions()`, `customers()`, `subscribers()`, `discountCodes()`, `products()`, `transactions()`, `refunds()`, `webhooks()`
+- **FanbasisClient**: Centralized HTTP client with retry logic (429/5xx), configurable timeout
+- **Webhook signature verification**: HMAC-SHA256 via `x-webhook-signature` header
+- **Webhook management API**: Create, list, delete, and test webhook subscriptions
+- **Customers API**: List, saved payment methods, direct charge
+- **Subscribers API**: List (by product/session/status), cancel, extend, refund
+- **Discount Codes API**: Full CRUD (percentage/fixed, duration, expiry, redemption limits)
+- **Products API**: List all products with payment links
+- **Transactions API**: Look up single or list all with filters
+- **Refunds API**: Full and partial refunds with optional reason
+- New config keys: `webhook_secret`, `creator_handle`, `timeout`, `retries`
+- `FanbasisClient` registered as singleton in container for direct DI
+
+### Changed
+- `FanbasisGateway` rewritten from scratch — clean, generic, no project-specific patterns
+- `parseWebhook()` uses standard `metadata.invoice_id` (no legacy key fallbacks)
+- `staticCheckout()` uses generic `query_params` or `metadata` (no hardcoded field names)
+- README rewritten — Stripe-quality documentation
+
 All notable changes to `laravel-payments` will be documented in this file.
 
 ## 2.0.0 — 2026-04-12
