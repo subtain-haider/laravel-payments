@@ -14,6 +14,7 @@ Every payment gateway has its own API, webhook format, and quirks. This package 
 - **Payment records** — `lp_payments` table tracks every attempt with polymorphic ownership
 - **Webhook handling** — automatic signature verification, status updates, event dispatch
 - **Status machine** — `pending → processing → paid → refunded` with guard rails
+- **API key fingerprinting** — every payment record and log entry captures which key version was active, enabling post-rotation auditing
 - **Built-in discount codes** — gateway-agnostic, with usage limits, validity windows, and audit trail
 - **Extensible** — add any PSP in 3 steps (implement interface, register in config, use it)
 
@@ -276,6 +277,64 @@ $order->payments;
 $order->hasPaidPayment();
 $order->latestPayment();
 ```
+
+### API Key Fingerprinting
+
+The package automatically captures a **non-reversible fingerprint** (`first4****last4`) of the gateway API key at the moment every payment is initiated. This solves the post-rotation audit problem: after a key change, you can look at any historical payment and know exactly which key version processed it.
+
+**No configuration required** — works automatically for all built-in gateways.
+
+#### In the database
+
+Every row in `lp_payments` has a `key_fingerprint` column:
+
+```php
+$payment = Payment::findByInvoiceId('inv_123');
+echo $payment->key_fingerprint;  // "sk_l****7890"
+```
+
+Query all payments processed with a specific key:
+
+```php
+Payment::where('key_fingerprint', 'sk_l****7890')->get();
+```
+
+#### In the logs
+
+Every log entry automatically includes a `_key_fingerprints` context array — no extra code needed:
+
+```
+[payments:fanbasis:checkout] checkout.initiated
+context: {
+    "invoice_id": "inv_123",
+    "_key_fingerprints": {
+        "api_key": "sk_l****7890",
+        "webhook_secret": "whs_****3z8x"
+    }
+}
+```
+
+#### Security properties
+
+- **Non-reversible** — the fingerprint cannot be used to reconstruct the original key.
+- **No key storage** — only the `first4****last4` mask is ever persisted or logged.
+- Fingerprints are computed **after** log redaction — raw key values never appear in output.
+
+#### Custom gateways
+
+Add `key_fields` to your gateway config so fingerprinting picks up your credentials:
+
+```php
+// config/lp_payments.php
+'my_gateway' => [
+    'driver'     => \App\Gateways\MyGateway::class,
+    'api_key'    => env('MY_GATEWAY_KEY'),
+    'api_secret' => env('MY_GATEWAY_SECRET'),
+    'key_fields' => ['api_key', 'api_secret'],  // ← add this
+],
+```
+
+If `key_fields` is omitted, the package falls back to checking `['api_key', 'api_token', 'secret', 'postback_key']`.
 
 ### Events
 

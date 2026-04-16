@@ -3,6 +3,7 @@
 namespace Subtain\LaravelPayments;
 
 use Illuminate\Support\Facades\Log;
+use Subtain\LaravelPayments\KeyFingerprint;
 
 /**
  * Central logging hub for the laravel-payments package.
@@ -172,7 +173,17 @@ class PaymentLogger
         // 4. Redact sensitive keys from context
         $safeContext = static::redact($context, $config['redact'] ?? []);
 
-        // 5. Build prefix for easy log scanning and write
+        // 5. Append key fingerprints for the gateway so every log entry carries
+        //    an audit trail of which API key was active at the time of the call.
+        //    This is done AFTER redaction so raw keys never appear in logs.
+        if ($gateway !== null) {
+            $fingerprints = KeyFingerprint::forGateway($gateway);
+            if ($fingerprints !== []) {
+                $safeContext['_key_fingerprints'] = $fingerprints;
+            }
+        }
+
+        // 6. Build prefix for easy log scanning and write
         $prefix  = static::buildPrefix($gateway, $category);
         $message = $prefix . $event;
 

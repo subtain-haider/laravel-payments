@@ -83,12 +83,17 @@ return [
             'creator_handle' => env('FANBASIS_CREATOR_HANDLE'),
             'timeout'        => (int) env('FANBASIS_TIMEOUT', 30),
             'retries'        => (int) env('FANBASIS_RETRIES', 2),
+            // Fields treated as authentication credentials for key fingerprinting.
+            // The first non-null field becomes the primary fingerprint stored on lp_payments.
+            'key_fields'     => ['api_key', 'webhook_secret'],
         ],
 
         'premiumpay' => [
             'driver'   => \Subtain\LaravelPayments\Gateways\PremiumPayGateway::class,
             'base_url' => env('PREMIUMPAY_BASE_URL', 'https://pre.api.premiumpay.pro/api/v1'),
             'api_key'  => env('PREMIUMPAY_API_KEY'),
+            // Fields treated as authentication credentials for key fingerprinting.
+            'key_fields' => ['api_key'],
         ],
 
         'match2pay' => [
@@ -98,6 +103,8 @@ return [
             'secret'    => env('MATCH2PAY_API_SECRET'),
             'timeout'   => (int) env('MATCH2PAY_TIMEOUT', 30),
             'retries'   => (int) env('MATCH2PAY_RETRIES', 2),
+            // Fields treated as authentication credentials for key fingerprinting.
+            'key_fields' => ['api_token', 'secret'],
         ],
 
         'rebornpay' => [
@@ -108,6 +115,8 @@ return [
             'postback_key' => env('REBORNPAY_CLIENT_POSTBACK_KEY'),
             'timeout'      => (int) env('REBORNPAY_TIMEOUT', 30),
             'retries'      => (int) env('REBORNPAY_RETRIES', 2),
+            // Fields treated as authentication credentials for key fingerprinting.
+            'key_fields' => ['api_key', 'postback_key'],
         ],
 
     ],

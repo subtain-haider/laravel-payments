@@ -1,5 +1,54 @@
 # Changelog
 
+## v4.2.0 — API Key Fingerprinting
+
+### Added
+
+- **`KeyFingerprint`** — New utility class that generates a non-reversible fingerprint of a gateway API key: `first4****last4` (e.g. `sk_l****7890`). Exposes enough to identify *which key version* was active without exposing the key itself.
+
+- **`key_fingerprint` column** — Added to `lp_payments`. Captured at the moment `PaymentService::initiate()` is called — before the gateway API is even contacted — so every payment record permanently stores which key was used to process it. Survives key rotations: after a rotation, old records still show the old key fingerprint and new records show the new one.
+
+- **`PaymentLogger` auto-enrichment** — Every log entry emitted through `PaymentLogger` for a known gateway now automatically includes a `_key_fingerprints` context key containing the fingerprint(s) of all configured credential fields for that gateway. This happens in one place (`PaymentLogger::write()`) — zero changes to any gateway file.
+
+- **`key_fields` per gateway config** — Each gateway in `config/lp_payments.php` now declares which of its config keys are authentication credentials. Defaults: `fanbasis` → `['api_key', 'webhook_secret']`, `premiumpay` → `['api_key']`, `match2pay` → `['api_token', 'secret']`, `rebornpay` → `['api_key', 'postback_key']`. Custom gateways use the same mechanism.
+
+- **`PaymentService` fingerprint logs** — Two new `PaymentLogger` calls at checkout initiation:
+  - `debug` `checkout.key.fingerprinted` — emitted when a key is found and fingerprinted (includes `key_fingerprint` in context)
+  - `warning` `checkout.key.not_configured` — emitted when no key is found in gateway config (signals a misconfiguration before the gateway call is even made)
+
+- **`add_key_fingerprint_to_payments_table` migration stub** — For existing installs that have already run the base migrations. Guards with `hasColumn()` so it is safe to re-run. Publishable via `--tag=payments-key-fingerprint-migration`.
+
+### Non-breaking
+
+- `key_fingerprint` is nullable — existing payments and any gateway without configured key fields get `null`. No data loss.
+- `KeyFingerprint::of(null)` and `KeyFingerprint::of('')` return `null` — safe to call unconditionally.
+- Keys shorter than 4 characters are fully masked (`****`) — edge case handled gracefully.
+- No gateway files were modified. The fingerprinting is entirely transparent to gateway implementations.
+
+### Security
+
+- The fingerprint is **non-reversible** — it cannot be used to reconstruct the original key.
+- Fingerprints are computed **after** `PaymentLogger`'s redaction step, so raw key values never appear in log output.
+- No key material is stored anywhere — only the `first4****last4` mask.
+- The `_key_fingerprints` log context key is deliberately named with a leading underscore to distinguish it from regular payload fields.
+
+### Upgrade guide
+
+**New installs:** no action needed — `key_fingerprint` is included in the updated `create_payments_table` migration stub.
+
+**Existing installs (already ran migrations):**
+```bash
+php artisan vendor:publish --tag=payments-key-fingerprint-migration
+php artisan migrate
+```
+
+**Re-publish config** to get `key_fields` in your local `config/lp_payments.php`:
+```bash
+php artisan vendor:publish --tag=payments-config --force
+```
+
+---
+
 ## v4.1.0 — Sandbox Mode
 
 ### Added

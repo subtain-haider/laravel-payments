@@ -9,6 +9,7 @@ use Subtain\LaravelPayments\DTOs\CheckoutResult;
 use Subtain\LaravelPayments\Enums\PaymentStatus;
 use Subtain\LaravelPayments\Facades\Payment;
 use Subtain\LaravelPayments\Gateways\SandboxGateway;
+use Subtain\LaravelPayments\KeyFingerprint;
 use Subtain\LaravelPayments\Models\Payment as PaymentModel;
 use Subtain\LaravelPayments\Models\PaymentLog;
 use Subtain\LaravelPayments\PaymentLogger;
@@ -52,21 +53,39 @@ class PaymentService
     ): CheckoutResult {
         $isSandbox = $this->sandboxResolver->shouldSandbox($gateway, $user);
 
+        // Compute the primary key fingerprint at the moment of payment initiation.
+        // This creates a permanent, auditable record of which API key version was
+        // active — essential for diagnosing issues after a key rotation.
+        $keyFingerprint = KeyFingerprint::primaryForGateway($gateway);
+
+        if ($keyFingerprint !== null) {
+            PaymentLogger::debug('key.fingerprinted', [
+                'invoice_id'      => $request->invoiceId ?: '(pending)',
+                'key_fingerprint' => $keyFingerprint,
+            ], gateway: $gateway, category: 'checkout');
+        } else {
+            PaymentLogger::warning('key.not_configured', [
+                'invoice_id' => $request->invoiceId ?: '(pending)',
+                'reason'     => 'No API key found in gateway config — key fingerprint will be null on this payment record',
+            ], gateway: $gateway, category: 'checkout');
+        }
+
         // 1. Create payment record (flagged if sandboxed)
         $payment = new PaymentModel([
-            'gateway'        => $gateway,
-            'invoice_id'     => $request->invoiceId ?: $this->generateInvoiceId(),
-            'amount'         => $request->amount,
-            'currency'       => $request->currency,
-            'status'         => PaymentStatus::PENDING,
-            'customer_email' => $request->customerEmail,
-            'customer_name'  => $request->customerName,
-            'customer_ip'    => $request->customerIp,
-            'success_url'    => $request->successUrl,
-            'cancel_url'     => $request->cancelUrl,
-            'webhook_url'    => $request->webhookUrl,
-            'metadata'       => $request->metadata,
-            'is_sandbox'     => $isSandbox,
+            'gateway'         => $gateway,
+            'invoice_id'      => $request->invoiceId ?: $this->generateInvoiceId(),
+            'amount'          => $request->amount,
+            'currency'        => $request->currency,
+            'status'          => PaymentStatus::PENDING,
+            'customer_email'  => $request->customerEmail,
+            'customer_name'   => $request->customerName,
+            'customer_ip'     => $request->customerIp,
+            'success_url'     => $request->successUrl,
+            'cancel_url'      => $request->cancelUrl,
+            'webhook_url'     => $request->webhookUrl,
+            'metadata'        => $request->metadata,
+            'is_sandbox'      => $isSandbox,
+            'key_fingerprint' => $keyFingerprint,
         ]);
 
         // Associate with payable model if provided

@@ -81,6 +81,12 @@ class PaymentServiceProvider extends ServiceProvider
                 => database_path('migrations/' . date('Y_m_d_His', time()) . '_add_sandbox_to_payments_tables.php'),
         ], 'payments-sandbox-migration');
 
+        // Publish addendum migration (for existing installs upgrading to key fingerprinting support)
+        $this->publishes([
+            __DIR__ . '/../database/migrations/add_key_fingerprint_to_payments_table.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time()) . '_add_key_fingerprint_to_payments_table.php'),
+        ], 'payments-key-fingerprint-migration');
+
         // Load webhook routes
         $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');
     }

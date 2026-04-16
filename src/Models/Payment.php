@@ -12,11 +12,12 @@ class Payment extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'status'     => PaymentStatus::class,
-        'amount'     => 'float',
-        'metadata'   => 'array',
-        'paid_at'    => 'datetime',
-        'is_sandbox' => 'boolean',
+        'status'          => PaymentStatus::class,
+        'amount'          => 'float',
+        'metadata'        => 'array',
+        'paid_at'         => 'datetime',
+        'is_sandbox'      => 'boolean',
+        'key_fingerprint' => 'string',  // first4****last4 of the gateway API key active at payment time
     ];
 
     public function __construct(array $attributes = [])

@@ -1,0 +1,43 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Adds the key_fingerprint column to the payments table.
+ *
+ * This column stores a non-reversible fingerprint of the gateway API key that
+ * was active at the time each payment was initiated (first 4 + '****' + last 4
+ * characters). It enables post-rotation auditing: given any historical payment,
+ * you can determine exactly which key version was used, without ever storing
+ * the key itself.
+ *
+ * Run this migration on existing installs upgrading from a version that did not
+ * yet have key fingerprinting support.
+ *
+ * Publish command:
+ *   php artisan vendor:publish --tag=payments-key-fingerprint-migration
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table(config('lp_payments.tables.payments', 'lp_payments'), function (Blueprint $table) {
+            $table->string('key_fingerprint', 32)
+                ->nullable()
+                ->after('is_sandbox')
+                ->comment('first4****last4 of the gateway API key active at payment initiation time');
+
+            $table->index('key_fingerprint');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table(config('lp_payments.tables.payments', 'lp_payments'), function (Blueprint $table) {
+            $table->dropIndex(['key_fingerprint']);
+            $table->dropColumn('key_fingerprint');
+        });
+    }
+};

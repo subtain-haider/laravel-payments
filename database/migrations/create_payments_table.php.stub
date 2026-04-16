@@ -45,6 +45,10 @@ return new class extends Migration
             // Sandbox flag — true when this payment was simulated (no real charge made)
             $table->boolean('is_sandbox')->default(false);
 
+            // first4****last4 fingerprint of the gateway API key active at payment initiation.
+            // Enables post-rotation auditing: which key version processed this payment?
+            $table->string('key_fingerprint', 32)->nullable();
+
             $table->timestamps();
 
             // Indexes
