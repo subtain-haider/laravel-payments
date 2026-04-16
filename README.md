@@ -25,7 +25,7 @@ Every payment gateway has its own API, webhook format, and quirks. This package 
 |---|---|---|---|---|---|
 | **[Fanbasis](docs/gateways/fanbasis.md)** | Cards, MoR | Dynamic, Embedded, Static, Subscriptions | 12 event types, HMAC-SHA256 | Customers, Subscribers, Discount Codes, Products, Transactions, Refunds, Webhooks | [Full docs →](docs/gateways/fanbasis.md) |
 | **PremiumPay** | Cards | API checkout | Callback-based | Checkout only | See below |
-| **Match2Pay** | Crypto (USDT, BTC, etc.) | API checkout | SHA-384 signature | Checkout only | See below |
+| **[Match2Pay](docs/gateways/match2pay.md)** | Crypto (USDT, BTC, ETH, BNB, etc.) | API checkout, 2-step selection | SHA-384 signature (DONE only) | Deposits, Withdrawals | [Full docs →](docs/gateways/match2pay.md) |
 | **[Rebornpay](docs/gateways/rebornpay.md)** | UPI / IMPS (India) | API checkout | MD5 + Python-repr signature | Pay-in, Transaction status, UTR storage | [Full docs →](docs/gateways/rebornpay.md) |
 | *Your gateway* | *Any* | *Implement `PaymentGateway`* | *Your logic* | *Your logic* | [Add a gateway →](#add-a-custom-gateway) |
 
@@ -144,13 +144,22 @@ Payment::gateway('premiumpay')->checkout(new CheckoutRequest(
 
 ### Match2Pay (Crypto)
 
+Crypto payments supporting USDT, BTC, ETH, BNB, and 40+ cryptocurrencies across all major networks.
+
 ```php
 Payment::gateway('match2pay')->checkout(new CheckoutRequest(
-    amount: 50.00,
+    amount:     299.00,
+    currency:   'USD',
     webhookUrl: route('payments.webhook', 'match2pay'),
-    extra: ['payment_currency' => 'USX', 'payment_gateway_name' => 'USDT TRC20'],
+    successUrl: 'https://app.com/payment/success',
+    extra: [
+        'payment_currency'     => 'USX',         // USDT TRC20
+        'payment_gateway_name' => 'USDT TRC20',  // omit both for 2-step selection
+    ],
 ));
 ```
+
+**[→ Full Match2Pay documentation](docs/gateways/match2pay.md)** — checkout flows, cryptocurrency reference, withdrawal API, callback signature verification, wallet expiry.
 
 ### Rebornpay (UPI / IMPS — India)
 

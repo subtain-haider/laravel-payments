@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.3.0 — Match2Pay Full Rewrite
+
+### Added
+- **`Match2PayClient`** — Dedicated HTTP client with `Content-Type: application/json`, retry logic (429/5xx), structured debug/error logging, sensitive field redaction
+- **`SignatureService`** — Correct SHA-384 request signature algorithm: fixed key order, amount formatted to 8dp with trailing zeros stripped, customer serialized in Java toString() style (not JSON). Also verifies inbound callback signatures (DONE status only)
+- **`DepositService`** — `POST /api/v2/payment/deposit` with full payload including customer object, signature auto-generated
+- **`WithdrawalService`** — `POST /api/v2/payment/withdrawal` with TON memo support
+- `Match2PayClient` registered as singleton in container
+- `docs/gateways/match2pay.md` — full usage guide covering setup, checkout flows, 2-step selection, cryptocurrency reference, customer object, withdrawals, callback verification, wallet expiry
+
+### Changed (breaking)
+- **`Match2PayGateway` rewritten** — replaced the incorrect `ksort()` signature algorithm with the correct fixed-key-order SHA-384 algorithm matching nys-be production and official docs
+- `parseWebhook()` now uses `finalAmount`/`finalCurrency` (account currency) instead of `transactionAmount`/`currency` (raw crypto) — this is the correct amount to credit
+- `verifyWebhook()` now verifies the inbound callback signature (SHA-384 of amount+currency+status+token+secret) from the HTTP header, and only for `DONE` status (per docs)
+- `checkout()` now accepts `extra['customer']` for a full customer object, or builds a minimal one from `CheckoutRequest` fields
+- Config keys `endpoint` and `hash_algo` removed (no longer needed)
+- Config key `base_url` default updated to `https://wallet.match2pay.com/api/v2/`
+- README: Match2Pay entry updated with full docs link and improved example
+
 ## v3.2.0 — Rebornpay (UPI) Gateway
 
 ### Added

@@ -2,40 +2,71 @@
 
 namespace Subtain\LaravelPayments\Gateways;
 
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 use Subtain\LaravelPayments\DTOs\CheckoutResult;
 use Subtain\LaravelPayments\DTOs\WebhookResult;
 use Subtain\LaravelPayments\Enums\PaymentStatus;
 use Subtain\LaravelPayments\Exceptions\PaymentException;
+use Subtain\LaravelPayments\Gateways\Match2Pay\DepositService;
+use Subtain\LaravelPayments\Gateways\Match2Pay\Match2PayClient;
+use Subtain\LaravelPayments\Gateways\Match2Pay\SignatureService;
+use Subtain\LaravelPayments\Gateways\Match2Pay\WithdrawalService;
 
 /**
  * Match2Pay crypto payment gateway.
  *
- * Config keys (in config/payments.php → gateways.match2pay):
- *   - base_url:  Match2Pay API URL
- *   - api_token: Match2Pay API token
- *   - secret:    Shared secret for signature generation
+ * Handles crypto deposits (pay-ins) and withdrawals (pay-outs) via the
+ * Match2Pay API v2.
+ *
+ * ── Checkout flow ──────────────────────────────────────────────────────────
+ * 1. checkout() builds a signed deposit request and sends it to
+ *    POST /api/v2/payment/deposit.
+ * 2. Returns the checkoutUrl to redirect the customer to the Match2Pay
+ *    payment page (or embed in an iframe).
+ * 3. If paymentCurrency/paymentGatewayName are provided in extra[], the
+ *    customer lands directly on the payment details step. Otherwise a
+ *    2-step crypto selection page is shown.
+ *
+ * ── Customer object ────────────────────────────────────────────────────────
+ * The customer object can be passed via extra['customer']. If omitted,
+ * a minimal customer object is built from the CheckoutRequest fields.
+ * The key order in the customer object is critical for signature generation
+ * and is enforced by SignatureService::formatCustomer().
+ *
+ * ── Webhook (callback) flow ────────────────────────────────────────────────
+ * Match2Pay sends two callbacks per transaction:
+ *   1. PENDING — transaction appears in blockchain
+ *   2. DONE    — funds confirmed and booked
+ *
+ * Per docs, signature verification should ONLY be performed for DONE status.
+ * The signature arrives in the HTTP header (header name varies — check your
+ * Match2Pay dashboard), not the body.
+ *
+ * ── Config keys (config/payments.php → gateways.match2pay) ───────────────
+ *   base_url   — API base URL (default: https://wallet.match2pay.com/api/v2/)
+ *   api_token  — Your API token (sent in every request body)
+ *   secret     — Your API secret (used for signature, never sent directly)
+ *   timeout    — HTTP timeout in seconds (default: 30)
+ *   retries    — Retry count on 429/5xx (default: 2)
+ *
+ * @see https://docs.match2pay.com
  */
 class Match2PayGateway implements PaymentGateway
 {
-    protected string $baseUrl;
+    protected Match2PayClient $client;
     protected string $apiToken;
-    protected string $secret;
-    protected string $hashAlgo;
-    protected string $endpoint;
+    protected string $apiSecret;
 
-    /**
-     * @param  array<string, mixed>  $config
-     */
+    protected ?DepositService $depositService = null;
+    protected ?WithdrawalService $withdrawalService = null;
+
     public function __construct(array $config = [])
     {
-        $this->baseUrl = rtrim($config['base_url'] ?? '', '/');
-        $this->apiToken = $config['api_token'] ?? '';
-        $this->secret = $config['secret'] ?? '';
-        $this->hashAlgo = $config['hash_algo'] ?? 'sha384';
-        $this->endpoint = $config['endpoint'] ?? 'deposit/crypto_agent';
+        $this->client    = new Match2PayClient($config);
+        $this->apiToken  = $config['api_token'] ?? '';
+        $this->apiSecret = $config['secret'] ?? '';
     }
 
     public function name(): string
@@ -43,99 +74,290 @@ class Match2PayGateway implements PaymentGateway
         return 'match2pay';
     }
 
+    // ── Checkout ───────────────────────────────────────────────────────────
+
+    /**
+     * Create a deposit transaction and return the checkout URL.
+     *
+     * Required CheckoutRequest fields:
+     *   - amount      — Deposit amount in the account currency
+     *   - currency    — Account currency (e.g. "USD")
+     *   - webhookUrl  — Your callback URL for Match2Pay to post status updates
+     *
+     * Optional extra fields:
+     *   - payment_currency      — e.g. "USX" (USDT TRC20). Omit for 2-step selection.
+     *   - payment_gateway_name  — e.g. "USDT TRC20". Omit for 2-step selection.
+     *   - customer              — Full customer array (see docs). Built from request fields if omitted.
+     *   - trading_account_login — Passed as tradingAccountLogin (defaults to customerEmail)
+     *   - trading_account_uuid  — Passed as tradingAccountUuid (defaults to invoiceId)
+     *
+     * @throws PaymentException
+     */
     public function checkout(CheckoutRequest $request): CheckoutResult
     {
-        $payload = [
-            'apiToken'           => $this->apiToken,
-            'callbackUrl'        => $request->webhookUrl,
-            'currency'           => $request->currency,
+        $customer = $request->extra['customer'] ?? $this->buildCustomer($request);
+
+        $data = array_filter([
             'amount'             => $request->amount,
-            'paymentCurrency'    => $request->extra['payment_currency'] ?? 'USX',
-            'paymentGatewayName' => $request->extra['payment_gateway_name'] ?? 'USDT TRC20',
-            'timestamp'          => (string) time(),
-        ];
+            'currency'           => $request->currency ?: 'USD',
+            'callbackUrl'        => $request->webhookUrl,
+            'successUrl'         => $request->successUrl,
+            'failureUrl'         => $request->extra['failure_url'] ?? $request->successUrl,
+            'customer'           => $customer,
+            'paymentCurrency'    => $request->extra['payment_currency'] ?? null,
+            'paymentGatewayName' => $request->extra['payment_gateway_name'] ?? null,
+            'paymentMethod'      => $request->extra['payment_method'] ?? 'CRYPTO_AGENT',
+        ], fn ($value) => $value !== null && $value !== '');
 
-        $payload['signature'] = $this->buildSignature($payload);
+        Log::info('Match2Pay checkout initiated', [
+            'invoice_id'          => $request->invoiceId,
+            'amount'              => $data['amount'],
+            'currency'            => $data['currency'],
+            'payment_currency'    => $data['paymentCurrency'] ?? null,
+            'payment_gateway'     => $data['paymentGatewayName'] ?? null,
+        ]);
 
-        $response = Http::asJson()->post("{$this->baseUrl}/{$this->endpoint}", $payload);
+        $response = $this->deposit()->create($data, $this->apiToken, $this->apiSecret);
 
-        if ($response->failed()) {
-            throw PaymentException::fromResponse(
-                gateway: $this->name(),
-                body: $response->body(),
-                statusCode: $response->status(),
-            );
-        }
+        $checkoutUrl = (string) ($response['checkoutUrl'] ?? '');
+        $paymentId   = (string) ($response['paymentId'] ?? '');
 
-        $data = $response->json();
+        if ($checkoutUrl === '') {
+            Log::error('Match2Pay checkout returned empty checkoutUrl', [
+                'invoice_id' => $request->invoiceId,
+                'response'   => $response,
+            ]);
 
-        if (($data['status'] ?? '') === 'error') {
             throw new PaymentException(
-                message: 'Match2Pay returned an error: ' . ($data['message'] ?? 'unknown'),
+                message: 'Match2Pay response missing checkoutUrl.',
                 gateway: $this->name(),
-                raw: $data,
+                raw: $response,
             );
         }
+
+        Log::info('Match2Pay checkout successful', [
+            'invoice_id'  => $request->invoiceId,
+            'payment_id'  => $paymentId,
+            'status'      => $response['status'] ?? null,
+            'expiration'  => $response['expiration'] ?? null,
+        ]);
 
         return new CheckoutResult(
-            redirectUrl: $data['data']['checkoutUrl'] ?? '',
-            transactionId: $data['data']['paymentId'] ?? '',
-            gateway: $this->name(),
-            raw: $data,
+            redirectUrl:   $checkoutUrl,
+            transactionId: $paymentId,
+            gateway:       $this->name(),
+            raw:           $response,
         );
     }
 
+    // ── Webhooks ───────────────────────────────────────────────────────────
+
+    /**
+     * Parse a Match2Pay callback payload into a standardized WebhookResult.
+     *
+     * Match2Pay sends two callbacks per transaction:
+     *   1. PENDING — transaction found on blockchain (do NOT credit yet)
+     *   2. DONE    — funds confirmed and booked (safe to credit)
+     *
+     * Use finalAmount + finalCurrency for crediting (these are in your account currency).
+     * Do NOT use transactionAmount for crediting — it is the raw crypto amount.
+     *
+     * Status mapping:
+     *   DONE                        → PaymentStatus::PAID
+     *   DECLINED, FAIL, SUSPECTED   → PaymentStatus::FAILED
+     *   PARTIALLY_PAID              → PaymentStatus::FAILED (requires additional payment)
+     *   everything else             → PaymentStatus::PENDING
+     */
     public function parseWebhook(array $payload): WebhookResult
     {
-        $status = $this->mapStatus($payload['status'] ?? '');
+        $status        = $this->mapStatus($payload['status'] ?? '');
+        $paymentId     = (string) ($payload['paymentId'] ?? '');
+        $finalAmount   = (float) ($payload['finalAmount'] ?? 0);
+        $finalCurrency = (string) ($payload['finalCurrency'] ?? 'USD');
+
+        Log::info('Match2Pay webhook parsed', [
+            'payment_id'           => $paymentId,
+            'status'               => $payload['status'] ?? null,
+            'mapped_status'        => $status->value,
+            'transaction_amount'   => $payload['transactionAmount'] ?? null,
+            'transaction_currency' => $payload['transactionCurrency'] ?? null,
+            'final_amount'         => $finalAmount,
+            'final_currency'       => $finalCurrency,
+        ]);
 
         return new WebhookResult(
-            status: $status,
-            invoiceId: $payload['orderId'] ?? '',
-            transactionId: $payload['paymentId'] ?? '',
-            gateway: $this->name(),
-            amount: (float) ($payload['transactionAmount'] ?? 0),
-            currency: $payload['currency'] ?? 'USD',
-            metadata: [],
+            status:        $status,
+            invoiceId:     $paymentId,
+            transactionId: (string) ($payload['cryptoTransactionInfo'][0]['txid'] ?? $paymentId),
+            gateway:       $this->name(),
+            amount:        $finalAmount,
+            currency:      $finalCurrency,
+            metadata:      [
+                'deposit_address'        => $payload['depositAddress'] ?? null,
+                'transaction_amount'     => $payload['transactionAmount'] ?? null,
+                'transaction_currency'   => $payload['transactionCurrency'] ?? null,
+                'net_amount'             => $payload['netAmount'] ?? null,
+                'processing_fee'         => $payload['processingFee'] ?? null,
+                'conversion_rate'        => $payload['conversionRate'] ?? null,
+                'crypto_transaction_info' => $payload['cryptoTransactionInfo'] ?? null,
+            ],
             raw: $payload,
         );
     }
 
+    /**
+     * Verify the Match2Pay callback signature.
+     *
+     * Per docs: ONLY verify for status = "DONE". For all other statuses
+     * the signature is not present and verification should be skipped.
+     *
+     * The signature is delivered in HTTP headers, not the body.
+     * Pass all request headers as $headers — this method looks for the
+     * signature under common header names (case-insensitive).
+     *
+     * @param  array<string, mixed>   $payload  Parsed callback body
+     * @param  array<string, string>  $headers  All request headers
+     */
     public function verifyWebhook(array $payload, array $headers = []): bool
     {
-        if (empty($this->secret)) {
+        if (empty($this->apiSecret)) {
+            Log::warning('Match2Pay webhook verification skipped: secret not configured');
+
             return true;
         }
 
-        $signature = $payload['signature'] ?? '';
-        unset($payload['signature']);
+        $status = strtoupper((string) ($payload['status'] ?? ''));
 
-        return hash_equals($this->buildSignature($payload), $signature);
+        // Per docs: only verify signature for DONE status
+        if ($status !== 'DONE') {
+            return true;
+        }
+
+        $signature = $this->extractSignatureFromHeaders($headers);
+
+        if ($signature === '') {
+            Log::warning('Match2Pay DONE callback received without signature header', [
+                'payment_id' => $payload['paymentId'] ?? null,
+            ]);
+
+            return false;
+        }
+
+        $valid = SignatureService::verifyCallbackSignature(
+            transactionAmount:  (string) ($payload['transactionAmount'] ?? '0'),
+            transactionCurrency: (string) ($payload['transactionCurrency'] ?? ''),
+            status:             $status,
+            apiToken:           $this->apiToken,
+            apiSecret:          $this->apiSecret,
+            receivedSignature:  $signature,
+        );
+
+        if (! $valid) {
+            Log::warning('Match2Pay webhook signature verification failed', [
+                'payment_id' => $payload['paymentId'] ?? null,
+            ]);
+        }
+
+        return $valid;
+    }
+
+    // ── Service Accessors ──────────────────────────────────────────────────
+
+    /**
+     * Access the Deposit service for direct API calls.
+     */
+    public function deposit(): DepositService
+    {
+        return $this->depositService ??= new DepositService($this->client);
     }
 
     /**
-     * Build a signature for the given payload.
-     *
-     * Uses the hash algorithm configured for this gateway (default: sha384).
-     * The signature is: hash(concatenated sorted values + secret).
-     *
-     * @param  array<string, mixed>  $data
+     * Access the Withdrawal service for direct API calls.
      */
-    public function buildSignature(array $data): string
+    public function withdrawal(): WithdrawalService
     {
-        unset($data['signature']);
-        ksort($data);
+        return $this->withdrawalService ??= new WithdrawalService($this->client);
+    }
 
-        return hash($this->hashAlgo, implode('', array_values($data)) . $this->secret);
+    /**
+     * Access the underlying HTTP client.
+     */
+    public function client(): Match2PayClient
+    {
+        return $this->client;
+    }
+
+    // ── Internal Helpers ───────────────────────────────────────────────────
+
+    /**
+     * Build a minimal customer object from a CheckoutRequest.
+     *
+     * Used when extra['customer'] is not provided. For production use,
+     * always pass a full customer object via extra['customer'] to include
+     * real customer data (name, address, phone) as required by Match2Pay.
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildCustomer(CheckoutRequest $request): array
+    {
+        $nameParts = explode(' ', trim($request->customerName), 2);
+
+        return [
+            'firstName' => $nameParts[0] ?? 'Customer',
+            'lastName'  => $nameParts[1] ?? '',
+            'address'   => [
+                'address' => '',
+                'city'    => '',
+                'country' => '',
+                'zipCode' => '',
+                'state'   => '',
+            ],
+            'contactInformation' => [
+                'email'       => $request->customerEmail,
+                'phoneNumber' => '',
+            ],
+            'locale'               => 'en_US',
+            'dateOfBirth'          => '',
+            'tradingAccountLogin'  => $request->extra['trading_account_login'] ?? $request->customerEmail,
+            'tradingAccountUuid'   => $request->extra['trading_account_uuid'] ?? $request->invoiceId,
+        ];
+    }
+
+    /**
+     * Extract the callback signature from request headers.
+     *
+     * Match2Pay may use different header names depending on configuration.
+     * We check common variants case-insensitively.
+     *
+     * @param  array<string, string|array>  $headers
+     */
+    protected function extractSignatureFromHeaders(array $headers): string
+    {
+        $candidates = ['x-signature', 'signature', 'x-api-signature', 'x-callback-signature'];
+
+        // Normalize header keys to lowercase for lookup
+        $normalized = [];
+        foreach ($headers as $key => $value) {
+            $normalized[strtolower($key)] = is_array($value) ? ($value[0] ?? '') : (string) $value;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (isset($normalized[$candidate]) && $normalized[$candidate] !== '') {
+                return $normalized[$candidate];
+            }
+        }
+
+        return '';
     }
 
     protected function mapStatus(string $status): PaymentStatus
     {
         return match (strtoupper($status)) {
-            'DONE', 'COMPLETED', 'APPROVED' => PaymentStatus::PAID,
-            'FAILED', 'ERROR', 'DECLINED'   => PaymentStatus::FAILED,
-            'CANCELLED', 'CANCELED'         => PaymentStatus::CANCELLED,
-            default                         => PaymentStatus::PENDING,
+            'DONE'                      => PaymentStatus::PAID,
+            'DECLINED', 'FAIL',
+            'SUSPECTED', 'PARTIALLY PAID' => PaymentStatus::FAILED,
+            'CANCELLED', 'CANCELED'     => PaymentStatus::CANCELLED,
+            default                     => PaymentStatus::PENDING,
         };
     }
 }

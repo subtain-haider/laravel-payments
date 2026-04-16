@@ -93,11 +93,11 @@ return [
 
         'match2pay' => [
             'driver'    => \Subtain\LaravelPayments\Gateways\Match2PayGateway::class,
-            'base_url'  => env('MATCH2PAY_API_URL'),
+            'base_url'  => env('MATCH2PAY_API_URL', 'https://wallet.match2pay.com/api/v2/'),
             'api_token' => env('MATCH2PAY_API_TOKEN'),
             'secret'    => env('MATCH2PAY_API_SECRET'),
-            'endpoint'  => env('MATCH2PAY_ENDPOINT', 'deposit/crypto_agent'),
-            'hash_algo' => 'sha384',
+            'timeout'   => (int) env('MATCH2PAY_TIMEOUT', 30),
+            'retries'   => (int) env('MATCH2PAY_RETRIES', 2),
         ],
 
         'rebornpay' => [
