@@ -42,6 +42,15 @@ return new class extends Migration
             $table->json('metadata')->nullable();               // Arbitrary app data
             $table->json('gateway_response')->nullable();       // Raw gateway checkout response
 
+            // Discount — populated automatically when a discountCode is passed to PaymentService::initiate().
+            // Storing these here enables the webhook handler to auto-record usage without developer involvement.
+            $table->foreignId('discount_code_id')
+                ->nullable()
+                ->constrained(config('lp_payments.tables.discount_codes', 'lp_discount_codes'))
+                ->nullOnDelete();
+            $table->decimal('discount_amount', 12, 2)->nullable(); // how much was discounted
+            $table->unsignedBigInteger('user_id')->nullable()->index(); // who made the payment (for per-user discount limits)
+
             // Sandbox flag — true when this payment was simulated (no real charge made)
             $table->boolean('is_sandbox')->default(false);
 

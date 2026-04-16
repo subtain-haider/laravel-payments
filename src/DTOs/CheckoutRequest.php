@@ -24,21 +24,29 @@ class CheckoutRequest
      * @param  string                $webhookUrl     URL for the gateway to send webhooks
      * @param  array<string, mixed>  $metadata       Arbitrary key-value data passed to the gateway
      * @param  array<string, mixed>  $extra          Gateway-specific fields (e.g. billing address, crypto currency)
+     * @param  string|null           $discountCode   Discount code to apply. The package validates, calculates,
+     *                                               and stores the discount automatically — the gateway always
+     *                                               receives the final discounted amount.
+     * @param  int|null              $userId         The authenticated user's ID. Required when using discountCode
+     *                                               with per-user redemption limits. Also stored on the payment
+     *                                               record so the webhook handler can auto-record usage.
      */
     public function __construct(
-        public readonly float  $amount,
-        public readonly string $currency = 'USD',
-        public readonly string $invoiceId = '',
-        public readonly string $customerEmail = '',
-        public readonly string $customerName = '',
-        public readonly string $customerIp = '',
-        public readonly string $productName = '',
-        public readonly string $productDescription = '',
-        public readonly string $successUrl = '',
-        public readonly string $cancelUrl = '',
-        public readonly string $webhookUrl = '',
-        public readonly array  $metadata = [],
-        public readonly array  $extra = [],
+        public readonly float   $amount,
+        public readonly string  $currency = 'USD',
+        public readonly string  $invoiceId = '',
+        public readonly string  $customerEmail = '',
+        public readonly string  $customerName = '',
+        public readonly string  $customerIp = '',
+        public readonly string  $productName = '',
+        public readonly string  $productDescription = '',
+        public readonly string  $successUrl = '',
+        public readonly string  $cancelUrl = '',
+        public readonly string  $webhookUrl = '',
+        public readonly array   $metadata = [],
+        public readonly array   $extra = [],
+        public readonly ?string $discountCode = null,
+        public readonly ?int    $userId = null,
     ) {}
 
     /**
@@ -62,6 +70,8 @@ class CheckoutRequest
             webhookUrl: $data['webhook_url'] ?? '',
             metadata: $data['metadata'] ?? [],
             extra: $data['extra'] ?? [],
+            discountCode: $data['discount_code'] ?? null,
+            userId: isset($data['user_id']) ? (int) $data['user_id'] : null,
         );
     }
 
@@ -86,6 +96,8 @@ class CheckoutRequest
             'webhook_url'         => $this->webhookUrl,
             'metadata'            => $this->metadata,
             'extra'               => $this->extra,
+            'discount_code'       => $this->discountCode,
+            'user_id'             => $this->userId,
         ];
     }
 }

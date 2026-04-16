@@ -10,6 +10,7 @@ use Subtain\LaravelPayments\Events\PaymentFailed;
 use Subtain\LaravelPayments\Events\PaymentSucceeded;
 use Subtain\LaravelPayments\Events\WebhookReceived;
 use Subtain\LaravelPayments\Facades\Payment;
+use Subtain\LaravelPayments\Models\DiscountCodeUsage;
 use Subtain\LaravelPayments\Models\Payment as PaymentModel;
 use Subtain\LaravelPayments\Models\PaymentLog;
 
@@ -89,11 +90,69 @@ class WebhookController extends Controller
         // Dispatch status-specific events
         if ($result->isSuccessful()) {
             PaymentSucceeded::dispatch($result, $payment);
+
+            // Auto-record discount usage when enabled in config.
+            // This runs only when: payment has a discount_code_id, the feature is
+            // enabled via config('lp_payments.auto_record_discount_usage'), and no
+            // usage record has been written yet for this payment (idempotency guard).
+            if ($payment && $payment->discount_code_id && config('lp_payments.auto_record_discount_usage', false)) {
+                $this->autoRecordDiscountUsage($payment);
+            }
         } elseif ($result->isFailed()) {
             PaymentFailed::dispatch($result, $payment);
         }
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Auto-record discount code usage after a confirmed payment.
+     *
+     * Idempotency: checks whether a DiscountCodeUsage row already exists for this
+     * payment's payable before writing — safe against duplicate webhook calls.
+     *
+     * Only runs when config('lp_payments.auto_record_discount_usage') is true AND
+     * the payment has a discount_code_id stored (set by PaymentService::initiate()).
+     */
+    protected function autoRecordDiscountUsage(PaymentModel $payment): void
+    {
+        // Idempotency guard — if a usage record already exists for this payable + discount, skip.
+        $alreadyRecorded = DiscountCodeUsage::where('discount_code_id', $payment->discount_code_id)
+            ->when($payment->payable_type && $payment->payable_id, function ($q) use ($payment) {
+                $q->where('payable_type', $payment->payable_type)
+                  ->where('payable_id', $payment->payable_id);
+            })
+            ->when(! $payment->payable_type, function ($q) use ($payment) {
+                $q->where('user_id', $payment->user_id);
+            })
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        $discountCode = $payment->discountCode;
+
+        if (! $discountCode) {
+            return;
+        }
+
+        $discountCode->incrementUsage();
+
+        $usage = new DiscountCodeUsage([
+            'discount_code_id' => $discountCode->id,
+            'user_id'          => $payment->user_id,
+            'original_amount'  => $payment->amount + $payment->discount_amount,
+            'discount_amount'  => $payment->discount_amount,
+            'final_amount'     => $payment->amount,
+        ]);
+
+        if ($payment->payable_type && $payment->payable_id) {
+            $usage->payable_type = $payment->payable_type;
+            $usage->payable_id   = $payment->payable_id;
+        }
+
+        $usage->save();
     }
 
     /**

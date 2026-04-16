@@ -206,6 +206,31 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Automatic Discount Usage Recording
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the package automatically records discount code usage in
+    | lp_discount_code_usages immediately after a webhook confirms a successful
+    | payment — no developer action required.
+    |
+    | Requirements:
+    |   - Pass discountCode and userId on CheckoutRequest (or use initiate() directly).
+    |   - The payment must have been tracked via PaymentService::initiate().
+    |
+    | Idempotency: if a usage record already exists for this payable + discount
+    | combination, the webhook handler will skip recording. Safe against duplicate
+    | webhook calls from any gateway.
+    |
+    | Set to false if you prefer to call DiscountService::recordUsage() manually
+    | in your own listener — e.g. when you want to record usage only after your
+    | own fulfillment logic has completed.
+    |
+    */
+
+    'auto_record_discount_usage' => env('PAYMENTS_AUTO_RECORD_DISCOUNT', true),
+
     'sandbox' => [
 
         /*

@@ -3,6 +3,7 @@
 namespace Subtain\LaravelPayments\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Subtain\LaravelPayments\Enums\PaymentStatus;
@@ -12,12 +13,13 @@ class Payment extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'status'          => PaymentStatus::class,
-        'amount'          => 'float',
-        'metadata'        => 'array',
-        'paid_at'         => 'datetime',
-        'is_sandbox'      => 'boolean',
-        'key_fingerprint' => 'string',  // first4****last4 of the gateway API key active at payment time
+        'status'           => PaymentStatus::class,
+        'amount'           => 'float',
+        'discount_amount'  => 'float',
+        'metadata'         => 'array',
+        'paid_at'          => 'datetime',
+        'is_sandbox'       => 'boolean',
+        'key_fingerprint'  => 'string',  // first4****last4 of the gateway API key active at payment time
     ];
 
     public function __construct(array $attributes = [])
@@ -34,6 +36,14 @@ class Payment extends Model
     public function payable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * The discount code applied to this payment, if any.
+     */
+    public function discountCode(): BelongsTo
+    {
+        return $this->belongsTo(DiscountCode::class);
     }
 
     /**
@@ -116,6 +126,14 @@ class Payment extends Model
     }
 
     // ── Query Helpers ──────────────────────────────────────
+
+    /**
+     * Whether a discount was applied to this payment.
+     */
+    public function hasDiscount(): bool
+    {
+        return $this->discount_code_id !== null;
+    }
 
     public function isPaid(): bool
     {

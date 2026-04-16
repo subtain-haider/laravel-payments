@@ -4,6 +4,7 @@ namespace Subtain\LaravelPayments;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Subtain\LaravelPayments\DiscountService;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 use Subtain\LaravelPayments\DTOs\CheckoutResult;
 use Subtain\LaravelPayments\Enums\PaymentStatus;
@@ -35,7 +36,10 @@ use Subtain\LaravelPayments\PaymentLogger;
  */
 class PaymentService
 {
-    public function __construct(private readonly SandboxResolver $sandboxResolver) {}
+    public function __construct(
+        private readonly SandboxResolver $sandboxResolver,
+        private readonly DiscountService $discountService,
+    ) {}
 
     /**
      * Initiate a payment: create DB record → call gateway → update record → return result.
@@ -52,6 +56,41 @@ class PaymentService
         ?Authenticatable $user = null,
     ): CheckoutResult {
         $isSandbox = $this->sandboxResolver->shouldSandbox($gateway, $user);
+
+        // ── Discount resolution ────────────────────────────────────────────────
+        // When a discountCode is provided on the CheckoutRequest, the package
+        // validates and applies it automatically. The gateway always receives
+        // the final discounted amount — it never sees the code itself.
+        $discountResult = null;
+        $finalAmount    = $request->amount;
+
+        if ($request->discountCode !== null) {
+            $discountResult = $this->discountService->apply(
+                code:    $request->discountCode,
+                amount:  $request->amount,
+                userId:  $request->userId,
+                gateway: $gateway,
+            );
+            $finalAmount = $discountResult->finalAmount;
+
+            // Rebuild the request with the discounted amount so the gateway
+            // receives the correct figure. All other fields stay identical.
+            $request = new CheckoutRequest(
+                amount:             $finalAmount,
+                currency:           $request->currency,
+                invoiceId:          $request->invoiceId,
+                customerEmail:      $request->customerEmail,
+                customerName:       $request->customerName,
+                customerIp:         $request->customerIp,
+                productName:        $request->productName,
+                productDescription: $request->productDescription,
+                successUrl:         $request->successUrl,
+                cancelUrl:          $request->cancelUrl,
+                webhookUrl:         $request->webhookUrl,
+                metadata:           $request->metadata,
+                extra:              $request->extra,
+            );
+        }
 
         // Compute the primary key fingerprint at the moment of payment initiation.
         // This creates a permanent, auditable record of which API key version was
@@ -72,20 +111,24 @@ class PaymentService
 
         // 1. Create payment record (flagged if sandboxed)
         $payment = new PaymentModel([
-            'gateway'         => $gateway,
-            'invoice_id'      => $request->invoiceId ?: $this->generateInvoiceId(),
-            'amount'          => $request->amount,
-            'currency'        => $request->currency,
-            'status'          => PaymentStatus::PENDING,
-            'customer_email'  => $request->customerEmail,
-            'customer_name'   => $request->customerName,
-            'customer_ip'     => $request->customerIp,
-            'success_url'     => $request->successUrl,
-            'cancel_url'      => $request->cancelUrl,
-            'webhook_url'     => $request->webhookUrl,
-            'metadata'        => $request->metadata,
-            'is_sandbox'      => $isSandbox,
-            'key_fingerprint' => $keyFingerprint,
+            'gateway'          => $gateway,
+            'invoice_id'       => $request->invoiceId ?: $this->generateInvoiceId(),
+            'amount'           => $request->amount,   // already discounted if discountCode was provided
+            'currency'         => $request->currency,
+            'status'           => PaymentStatus::PENDING,
+            'customer_email'   => $request->customerEmail,
+            'customer_name'    => $request->customerName,
+            'customer_ip'      => $request->customerIp,
+            'success_url'      => $request->successUrl,
+            'cancel_url'       => $request->cancelUrl,
+            'webhook_url'      => $request->webhookUrl,
+            'metadata'         => $request->metadata,
+            'is_sandbox'       => $isSandbox,
+            'key_fingerprint'  => $keyFingerprint,
+            // Discount — populated when discountCode was passed, null otherwise
+            'discount_code_id' => $discountResult?->discountCode->id,
+            'discount_amount'  => $discountResult?->discountAmount,
+            'user_id'          => $request->userId,
         ]);
 
         // Associate with payable model if provided
