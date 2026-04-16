@@ -21,7 +21,7 @@ class Payment extends Model
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
-        $this->setTable(config('payments.tables.payments', 'lp_payments'));
+        $this->setTable(config('lp_payments.tables.payments', 'lp_payments'));
     }
 
     // ── Relationships ──────────────────────────────────────

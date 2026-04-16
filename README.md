@@ -181,14 +181,14 @@ Payment::gateway('rebornpay')->checkout(new CheckoutRequest(
 
 ## Logging
 
-All log output from every gateway, HTTP client, webhook handler, and service flows through a single central class — `PaymentLogger`. You control where logs go, at what level, and what sensitive data is masked, all from `config/payments.php`.
+All log output from every gateway, HTTP client, webhook handler, and service flows through a single central class — `PaymentLogger`. You control where logs go, at what level, and what sensitive data is masked, all from `config/lp_payments.php`.
 
 **Zero configuration required.** Out of the box, the package logs to the same channel as the rest of your application.
 
 ### Quick Setup
 
 ```php
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'enabled' => true,
     'level'   => env('PAYMENTS_LOG_LEVEL', 'info'),  // 'debug' in local, 'info' in prod
@@ -298,7 +298,7 @@ php artisan vendor:publish --tag=payments-migrations
 php artisan migrate
 ```
 
-This creates two tables (names configurable in `config/payments.php`):
+This creates two tables (names configurable in `config/lp_payments.php`):
 
 | Table | Purpose |
 |---|---|
@@ -569,7 +569,7 @@ class StripeGateway implements PaymentGateway
     public function verifyWebhook(array $payload, array $headers = []): bool { /* ... */ }
 }
 
-// 2. Register in config/payments.php
+// 2. Register in config/lp_payments.php
 'stripe' => [
     'driver' => \App\Gateways\StripeGateway::class,
     'secret' => env('STRIPE_SECRET'),

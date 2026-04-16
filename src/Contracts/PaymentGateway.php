@@ -11,7 +11,7 @@ use Subtain\LaravelPayments\DTOs\WebhookResult;
  *
  * To add a new gateway:
  * 1. Create a class that implements this interface
- * 2. Register it in config/payments.php under 'gateways'
+ * 2. Register it in config/lp_payments.php under 'gateways'
  * 3. That's it — the package resolves it automatically
  *
  * @see \Subtain\LaravelPayments\DTOs\CheckoutRequest  What you send

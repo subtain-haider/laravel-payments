@@ -22,7 +22,7 @@ class DiscountCodeUsage extends Model
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
-        $this->setTable(config('payments.tables.discount_code_usages', 'lp_discount_code_usages'));
+        $this->setTable(config('lp_payments.tables.discount_code_usages', 'lp_discount_code_usages'));
     }
 
     // ── Relationships ──────────────────────────────────────

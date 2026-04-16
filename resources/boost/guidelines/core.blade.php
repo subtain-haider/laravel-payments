@@ -173,7 +173,7 @@ class StripeGateway implements \Subtain\LaravelPayments\Contracts\PaymentGateway
     public function verifyWebhook(array $payload, array $headers = []): bool { ... }
 }
 
-// 2. Register in config/payments.php
+// 2. Register in config/lp_payments.php
 'stripe' => ['driver' => StripeGateway::class, 'secret' => env('STRIPE_SECRET')],
 
 // 3. Use it — no other changes needed
@@ -191,7 +191,7 @@ $gateway->checkout($request);
 $gateway = 'fanbasis'; // hardcoded
 
 // ✅ CORRECT — use PaymentService for DB tracking
-app(PaymentService::class)->initiate(config('payments.default'), $request, $payable);
+app(PaymentService::class)->initiate(config('lp_payments.default'), $request, $payable);
 
 // ✅ CORRECT — webhook URL always uses the package route
 webhookUrl: route('payments.webhook', $gatewayName),

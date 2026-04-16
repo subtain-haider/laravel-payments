@@ -8,12 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('payments.tables.payment_logs', 'lp_payment_logs'), function (Blueprint $table) {
+        Schema::create(config('lp_payments.tables.payment_logs', 'lp_payment_logs'), function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('payment_id')
                 ->nullable()
-                ->constrained(config('payments.tables.payments', 'lp_payments'))
+                ->constrained(config('lp_payments.tables.payments', 'lp_payments'))
                 ->nullOnDelete();
 
             $table->string('gateway');
@@ -35,6 +35,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists(config('payments.tables.payment_logs', 'lp_payment_logs'));
+        Schema::dropIfExists(config('lp_payments.tables.payment_logs', 'lp_payment_logs'));
     }
 };

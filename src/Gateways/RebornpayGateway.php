@@ -36,7 +36,7 @@ use Subtain\LaravelPayments\Gateways\Rebornpay\TransactionService;
  * Signature algorithm: MD5 of Python-style URL-encoded key=value pairs.
  * See SignatureService for full details and float-precision handling.
  *
- * ── Config keys (config/payments.php → gateways.rebornpay) ────────
+ * ── Config keys (config/lp_payments.php → gateways.rebornpay) ────────
  *   base_url        — API base URL (default: https://prod.api.rbpcloud.pro)
  *   api_key         — X-API-Key header value
  *   client_id       — Your Rebornpay client UUID

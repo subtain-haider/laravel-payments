@@ -163,7 +163,7 @@ return [
         /*
         | Per-gateway (and global default) log channel routing.
         |
-        | Keys must match gateway names as defined in config('payments.gateways').
+        | Keys must match gateway names as defined in config('lp_payments.gateways').
         | Values must match a channel name defined in config('logging.channels').
         |
         | The special key 'default' is the fallback for any gateway not

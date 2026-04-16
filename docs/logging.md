@@ -62,7 +62,7 @@ Every event the package emits, organized by category:
 
 ## All Config Options
 
-In your published `config/payments.php`, under the `logging` key:
+In your published `config/lp_payments.php`, under the `logging` key:
 
 ```php
 'logging' => [
@@ -112,7 +112,7 @@ In your published `config/payments.php`, under the `logging` key:
     ],
 ],
 
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'channels' => ['default' => 'payments'],
 ],
@@ -123,7 +123,7 @@ In your published `config/payments.php`, under the `logging` key:
 Match2Pay errors to Slack, Rebornpay to a dedicated file, everything else to the default stack:
 
 ```php
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'channels' => [
         'match2pay'  => 'slack',
@@ -165,7 +165,7 @@ Install a community Telegram logger, register it as a channel, and point the gat
     ],
 ],
 
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'channels' => [
         'default' => 'telegram',  // all gateway errors → Telegram
@@ -198,7 +198,7 @@ Send all payment logs to both a file AND Slack (errors only on Slack):
     ],
 ],
 
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'channels' => ['default' => 'payments_stack'],
 ],
@@ -234,7 +234,7 @@ class DatabaseLogger extends AbstractProcessingHandler
     ],
 ],
 
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'channels' => ['default' => 'db_payments'],
 ],
@@ -269,7 +269,7 @@ Debug logs are too noisy for production. Use `info` globally and keep only one g
 PAYMENTS_LOG_LEVEL=info
 PAYMENTS_LOG_CHANNEL=payments
 
-// config/payments.php
+// config/lp_payments.php
 'logging' => [
     'level'  => env('PAYMENTS_LOG_LEVEL', 'info'),
     'channels' => [
@@ -355,7 +355,7 @@ class StripeGateway implements PaymentGateway
 }
 ```
 
-Then in `config/payments.php`, the developer can route `stripe` logs just like any built-in gateway:
+Then in `config/lp_payments.php`, the developer can route `stripe` logs just like any built-in gateway:
 
 ```php
 'logging' => [
@@ -372,9 +372,9 @@ Then in `config/payments.php`, the developer can route `stripe` logs just like a
 For every log call, the channel is resolved in this order:
 
 ```
-1. config('payments.logging.channels.{gateway}')   ← per-gateway override
+1. config('lp_payments.logging.channels.{gateway}')   ← per-gateway override
        ↓ null?
-2. config('payments.logging.channels.default')      ← package default
+2. config('lp_payments.logging.channels.default')      ← package default
        ↓ null?
 3. Laravel's own default channel                    ← app's config('logging.default')
 ```
@@ -382,9 +382,9 @@ For every log call, the channel is resolved in this order:
 And the minimum level:
 
 ```
-1. config('payments.logging.levels.{gateway}')     ← per-gateway level override
+1. config('lp_payments.logging.levels.{gateway}')     ← per-gateway level override
        ↓ not set?
-2. config('payments.logging.level')                ← global package level
+2. config('lp_payments.logging.level')                ← global package level
        ↓ not set?
 3. 'debug'                                         ← logs everything (hardcoded fallback)
 ```

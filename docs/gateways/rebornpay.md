@@ -152,13 +152,13 @@ use Subtain\LaravelPayments\Gateways\Rebornpay\SignatureService;
 // Preferred: use the raw body (preserves float precision)
 $valid = SignatureService::verifyFromRawBody(
     $request->getContent(),
-    config('payments.gateways.rebornpay.postback_key'),
+    config('lp_payments.gateways.rebornpay.postback_key'),
 );
 
 // Fallback: use parsed payload (may fail if amounts like 2000.0 are in payload)
 $valid = SignatureService::verify(
     $request->all(),
-    config('payments.gateways.rebornpay.postback_key'),
+    config('lp_payments.gateways.rebornpay.postback_key'),
 );
 ```
 
@@ -178,7 +178,7 @@ $status = $rbp->transactions()->checkByTransactionId('txn-rbp-xxx');
 
 // By your own client transaction ID
 $status = $rbp->transactions()->checkByClientTransactionId(
-    clientId: config('payments.gateways.rebornpay.client_id'),
+    clientId: config('lp_payments.gateways.rebornpay.client_id'),
     clientTransactionId: 'order_123',
 );
 

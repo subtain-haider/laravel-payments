@@ -202,8 +202,8 @@ $response = $m2p->deposit()->create([
     'paymentCurrency'    => 'USX',
     'paymentGatewayName' => 'USDT TRC20',
     'customer'           => [...],
-], apiToken: config('payments.gateways.match2pay.api_token'),
-   apiSecret: config('payments.gateways.match2pay.secret'));
+], apiToken: config('lp_payments.gateways.match2pay.api_token'),
+   apiSecret: config('lp_payments.gateways.match2pay.secret'));
 
 // $response['checkoutUrl'] → redirect to this
 // $response['paymentId']   → store this as your transaction reference
@@ -223,8 +223,8 @@ $response = $m2p->withdrawal()->create([
     'paymentCurrency'    => 'USX',
     'paymentGatewayName' => 'USDT TRC20',
     'customer'           => [...],
-], apiToken: config('payments.gateways.match2pay.api_token'),
-   apiSecret: config('payments.gateways.match2pay.secret'));
+], apiToken: config('lp_payments.gateways.match2pay.api_token'),
+   apiSecret: config('lp_payments.gateways.match2pay.secret'));
 ```
 
 > **TON withdrawals with memo:** Use `"walletAddress;memo"` format for `cryptoAddress`.

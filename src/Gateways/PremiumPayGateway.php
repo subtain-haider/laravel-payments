@@ -14,7 +14,7 @@ use Subtain\LaravelPayments\Exceptions\PaymentException;
 /**
  * PremiumPay payment gateway.
  *
- * Config keys (in config/payments.php → gateways.premiumpay):
+ * Config keys (in config/lp_payments.php → gateways.premiumpay):
  *   - base_url: PremiumPay API URL
  *   - api_key:  PremiumPay API bearer token
  */

@@ -16,7 +16,7 @@ class PaymentServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/payments.php', 'payments'
+            __DIR__ . '/../config/lp_payments.php', 'lp_payments'
         );
 
         $this->app->singleton('payment', function ($app) {
@@ -32,21 +32,21 @@ class PaymentServiceProvider extends ServiceProvider
 
         // Register FanbasisClient as a singleton for direct DI usage
         $this->app->singleton(FanbasisClient::class, function ($app) {
-            $config = $app['config']->get('payments.gateways.fanbasis', []);
+            $config = $app['config']->get('lp_payments.gateways.fanbasis', []);
 
             return new FanbasisClient($config);
         });
 
         // Register RebornpayClient as a singleton for direct DI usage
         $this->app->singleton(RebornpayClient::class, function ($app) {
-            $config = $app['config']->get('payments.gateways.rebornpay', []);
+            $config = $app['config']->get('lp_payments.gateways.rebornpay', []);
 
             return new RebornpayClient($config);
         });
 
         // Register Match2PayClient as a singleton for direct DI usage
         $this->app->singleton(Match2PayClient::class, function ($app) {
-            $config = $app['config']->get('payments.gateways.match2pay', []);
+            $config = $app['config']->get('lp_payments.gateways.match2pay', []);
 
             return new Match2PayClient($config);
         });
@@ -59,7 +59,7 @@ class PaymentServiceProvider extends ServiceProvider
     {
         // Publish config
         $this->publishes([
-            __DIR__ . '/../config/payments.php' => config_path('payments.php'),
+            __DIR__ . '/../config/lp_payments.php' => config_path('lp_payments.php'),
         ], 'payments-config');
 
         // Publish migrations

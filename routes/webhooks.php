@@ -15,11 +15,11 @@ use Subtain\LaravelPayments\Http\Controllers\WebhookController;
 |          POST /payments/webhook/premiumpay
 |          POST /payments/webhook/match2pay
 |
-| The route prefix and middleware are configurable in config/payments.php.
+| The route prefix and middleware are configurable in config/lp_payments.php.
 |
 */
 
 Route::post(
-    config('payments.webhook_path', 'payments/webhook') . '/{gateway}',
+    config('lp_payments.webhook_path', 'payments/webhook') . '/{gateway}',
     [WebhookController::class, 'handle']
 )->name('payments.webhook');

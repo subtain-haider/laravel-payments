@@ -13,7 +13,7 @@ use Subtain\LaravelPayments\Gateways\RebornpayGateway;
  * Payment gateway manager — uses Laravel's Manager pattern.
  *
  * Resolves gateway drivers from config. The default gateway
- * is set in config('payments.default').
+ * is set in config('lp_payments.default').
  *
  * Usage:
  *   Payment::checkout($request);            // uses default gateway
@@ -26,7 +26,7 @@ class PaymentManager extends Manager
      */
     public function getDefaultDriver(): string
     {
-        return $this->config->get('payments.default', 'fanbasis');
+        return $this->config->get('lp_payments.default', 'fanbasis');
     }
 
     /**
@@ -42,7 +42,7 @@ class PaymentManager extends Manager
      */
     protected function createFanbasisDriver(): FanbasisGateway
     {
-        $config = $this->config->get('payments.gateways.fanbasis', []);
+        $config = $this->config->get('lp_payments.gateways.fanbasis', []);
 
         return new FanbasisGateway($config);
     }
@@ -52,7 +52,7 @@ class PaymentManager extends Manager
      */
     protected function createPremiumpayDriver(): PremiumPayGateway
     {
-        $config = $this->config->get('payments.gateways.premiumpay', []);
+        $config = $this->config->get('lp_payments.gateways.premiumpay', []);
 
         return new PremiumPayGateway($config);
     }
@@ -62,7 +62,7 @@ class PaymentManager extends Manager
      */
     protected function createMatch2payDriver(): Match2PayGateway
     {
-        $config = $this->config->get('payments.gateways.match2pay', []);
+        $config = $this->config->get('lp_payments.gateways.match2pay', []);
 
         return new Match2PayGateway($config);
     }
@@ -72,7 +72,7 @@ class PaymentManager extends Manager
      */
     protected function createRebornpayDriver(): RebornpayGateway
     {
-        $config = $this->config->get('payments.gateways.rebornpay', []);
+        $config = $this->config->get('lp_payments.gateways.rebornpay', []);
 
         return new RebornpayGateway($config);
     }
@@ -90,7 +90,7 @@ class PaymentManager extends Manager
      */
     protected function createDriver($driver)
     {
-        $config = $this->config->get("payments.gateways.{$driver}", []);
+        $config = $this->config->get("lp_payments.gateways.{$driver}", []);
 
         // If a custom driver class is specified, use it
         if (isset($config['driver']) && class_exists($config['driver'])) {

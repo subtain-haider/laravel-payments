@@ -17,11 +17,11 @@ use Illuminate\Support\Facades\Log;
  * 1. Each call carries a `$gateway` name (e.g. "match2pay", "fanbasis") and a
  *    `$category` (e.g. "checkout", "webhook", "api", "signature").
  * 2. The logger looks up the channel to write to in this priority order:
- *      a. Per-gateway channel:  config('payments.logging.channels.match2pay')
- *      b. Default channel:      config('payments.logging.channels.default')
+ *      a. Per-gateway channel:  config('lp_payments.logging.channels.match2pay')
+ *      b. Default channel:      config('lp_payments.logging.channels.default')
  *      c. App default:          config('logging.default')  (Laravel's own default)
  * 3. Calls below the configured minimum level are silently dropped.
- * 4. Context keys listed in config('payments.logging.redact') are masked.
+ * 4. Context keys listed in config('lp_payments.logging.redact') are masked.
  *
  * ## Usage inside the package
  *
@@ -33,7 +33,7 @@ use Illuminate\Support\Facades\Log;
  *
  * ## Developer configuration
  *
- * See config/payments.php under the `logging` key, or refer to docs/logging.md.
+ * See config/lp_payments.php under the `logging` key, or refer to docs/logging.md.
  */
 class PaymentLogger
 {
@@ -146,7 +146,7 @@ class PaymentLogger
         ?string $gateway = null,
         ?string $category = null,
     ): void {
-        $config = config('payments.logging', []);
+        $config = config('lp_payments.logging', []);
 
         // 1. Global kill switch
         if (! ($config['enabled'] ?? true)) {
@@ -213,7 +213,7 @@ class PaymentLogger
      * Replaces the value of any key listed in $redactKeys with '[redacted]'.
      * Works recursively on nested arrays so deeply-nested secrets are also masked.
      *
-     * The default redact list is defined in config('payments.logging.redact') and
+     * The default redact list is defined in config('lp_payments.logging.redact') and
      * covers common credential field names. Developers may extend this list.
      *
      * @param  array<string, mixed>  $context

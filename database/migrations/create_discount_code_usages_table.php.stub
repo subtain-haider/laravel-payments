@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('payments.tables.discount_code_usages', 'lp_discount_code_usages'), function (Blueprint $table) {
+        Schema::create(config('lp_payments.tables.discount_code_usages', 'lp_discount_code_usages'), function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('discount_code_id')
-                ->constrained(config('payments.tables.discount_codes', 'lp_discount_codes'))
+                ->constrained(config('lp_payments.tables.discount_codes', 'lp_discount_codes'))
                 ->cascadeOnDelete();
 
             $table->unsignedBigInteger('user_id')->nullable()->index();
@@ -34,6 +34,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists(config('payments.tables.discount_code_usages', 'lp_discount_code_usages'));
+        Schema::dropIfExists(config('lp_payments.tables.discount_code_usages', 'lp_discount_code_usages'));
     }
 };

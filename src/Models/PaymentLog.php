@@ -18,7 +18,7 @@ class PaymentLog extends Model
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
-        $this->setTable(config('payments.tables.payment_logs', 'lp_payment_logs'));
+        $this->setTable(config('lp_payments.tables.payment_logs', 'lp_payment_logs'));
     }
 
     /**

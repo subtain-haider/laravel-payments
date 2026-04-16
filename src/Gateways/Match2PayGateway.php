@@ -44,7 +44,7 @@ use Subtain\LaravelPayments\Gateways\Match2Pay\WithdrawalService;
  * The signature arrives in the HTTP header (header name varies — check your
  * Match2Pay dashboard), not the body.
  *
- * ── Config keys (config/payments.php → gateways.match2pay) ───────────────
+ * ── Config keys (config/lp_payments.php → gateways.match2pay) ───────────────
  *   base_url   — API base URL (default: https://wallet.match2pay.com/api/v2/)
  *   api_token  — Your API token (sent in every request body)
  *   secret     — Your API secret (used for signature, never sent directly)

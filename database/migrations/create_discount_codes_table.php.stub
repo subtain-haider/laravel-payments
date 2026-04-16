@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('payments.tables.discount_codes', 'lp_discount_codes'), function (Blueprint $table) {
+        Schema::create(config('lp_payments.tables.discount_codes', 'lp_discount_codes'), function (Blueprint $table) {
             $table->id();
 
             $table->string('code')->unique();
@@ -46,6 +46,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists(config('payments.tables.discount_codes', 'lp_discount_codes'));
+        Schema::dropIfExists(config('lp_payments.tables.discount_codes', 'lp_discount_codes'));
     }
 };

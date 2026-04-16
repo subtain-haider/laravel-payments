@@ -1,10 +1,44 @@
 # Changelog
 
+## v4.0.0 — Config Key Renamed to Avoid Conflicts (Breaking)
+
+### Breaking Changes
+- **Config file renamed** from `config/payments.php` to `config/lp_payments.php`
+- **Config key renamed** from `'payments'` to `'lp_payments'` — all `config('payments.xxx')` calls must be updated to `config('lp_payments.xxx')`
+
+### Why
+`payments` is an extremely common config key. Any Laravel project that already has its own `config/payments.php` (for Stripe, Cashier, or any in-house payment module) would silently have its config overwritten or conflict with this package's key. The `lp_` prefix (Laravel Payments) is already used for all database tables (`lp_payments`, `lp_payment_logs`, etc.) — this change makes the config consistent with that convention.
+
+### Migration Guide
+
+1. **Re-publish the config file:**
+   ```bash
+   php artisan vendor:publish --tag=payments-config --force
+   ```
+   This publishes the new `config/lp_payments.php`. Delete the old `config/payments.php` manually if it exists.
+
+2. **Update any direct config references in your app:**
+   ```php
+   // Before
+   config('payments.default')
+   config('payments.gateways.fanbasis.api_key')
+
+   // After
+   config('lp_payments.default')
+   config('lp_payments.gateways.fanbasis.api_key')
+   ```
+
+3. **No DB migrations needed** — table names are unchanged (`lp_payments`, `lp_payment_logs`, etc.)
+
+### Other Changes
+- All internal `config('payments.xxx')` calls across all gateways, clients, models, routes, and service provider updated to `config('lp_payments.xxx')`
+- All documentation and docblock references updated
+
 ## v3.4.0 — Centralized Logging System
 
 ### Added
 - **`PaymentLogger`** — Single central logging hub for the entire package. All log output from every gateway, HTTP client, webhook handler, and service now flows through this class instead of being scattered across individual files with raw `Log::` calls
-- **`config('payments.logging')`** — New config block with full control over:
+- **`config('lp_payments.logging')`** — New config block with full control over:
   - `enabled` — global kill switch (`PAYMENTS_LOGGING_ENABLED`)
   - `level` — global minimum level, e.g. `'info'` in production (`PAYMENTS_LOG_LEVEL`)
   - `channels` — per-gateway channel routing + global `'default'`; supports any Laravel log channel (file, Slack, Telegram, ClickHouse, DB, stack, etc.)

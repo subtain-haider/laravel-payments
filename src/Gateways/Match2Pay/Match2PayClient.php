@@ -20,7 +20,7 @@ use Subtain\LaravelPayments\Exceptions\PaymentException;
  * WithdrawalService) are responsible for building payloads and interpreting
  * responses.
  *
- * Config keys (config/payments.php → gateways.match2pay):
+ * Config keys (config/lp_payments.php → gateways.match2pay):
  *   base_url   — API base URL (e.g. https://wallet.match2pay.com/api/v2/)
  *   api_token  — Your API token (included in every request body)
  *   secret     — Your API secret (used for signature generation only, never sent directly)

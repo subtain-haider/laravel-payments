@@ -25,7 +25,7 @@ use Subtain\LaravelPayments\Gateways\Fanbasis\WebhooksService;
  *   2. Embedded  — creates an embedded checkout for iframes (extra['embedded'] = true)
  *   3. Static    — redirects to a pre-built payment link (extra['payment_link'])
  *
- * Config (config/payments.php → gateways.fanbasis):
+ * Config (config/lp_payments.php → gateways.fanbasis):
  *   base_url, api_key, webhook_secret, creator_handle, timeout, retries
  *
  * @see https://apidocs.fan
