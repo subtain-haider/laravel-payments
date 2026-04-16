@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.4.0 — Centralized Logging System
+
+### Added
+- **`PaymentLogger`** — Single central logging hub for the entire package. All log output from every gateway, HTTP client, webhook handler, and service now flows through this class instead of being scattered across individual files with raw `Log::` calls
+- **`config('payments.logging')`** — New config block with full control over:
+  - `enabled` — global kill switch (`PAYMENTS_LOGGING_ENABLED`)
+  - `level` — global minimum level, e.g. `'info'` in production (`PAYMENTS_LOG_LEVEL`)
+  - `channels` — per-gateway channel routing + global `'default'`; supports any Laravel log channel (file, Slack, Telegram, ClickHouse, DB, stack, etc.)
+  - `levels` — per-gateway minimum level overrides
+  - `redact` — case-insensitive, recursive sensitive field masking (defaults cover `api_key`, `secret`, `signature`, `token`, `password`, and more)
+- **`FanbasisClient` logging** — Previously completely silent. Now emits `debug` on every request/response and `error` on HTTP failures and gateway error bodies
+- **`PremiumPayGateway` logging** — Previously completely silent. Now emits `info` on checkout initiation/success and `error` on HTTP/gateway failures and webhook parsing
+- **`docs/logging.md`** — Full logging reference: all 15+ log events, every config option, 8 copy-paste recipes (dedicated file, per-gateway Slack, Telegram, ClickHouse, custom DB handler, stack, production setup, test silencing), redaction guide, channel resolution diagram, grep examples, and how to use `PaymentLogger` in custom gateways
+- README: New **Logging** section with quick setup, message format, event reference table, and link to full docs
+
+### Changed
+- All `Log::` calls in `Match2PayClient`, `Match2PayGateway`, `RebornpayClient`, `RebornpayGateway` replaced with `PaymentLogger::` — same events, now routable and filterable
+- Log events renamed from freeform sentences to dot-notation (`checkout.initiated`, `webhook.parsed`, `api.request`, etc.) for consistent machine-parseable format
+- Log context for signature warnings now includes a `reason` key (e.g. `postback_key not configured`) for clearer diagnostics
+
+### Non-breaking
+- Zero configuration required — defaults to the app's existing log channel, identical behaviour to before
+- `PaymentLog` DB audit trail (`lp_payment_logs`) is unaffected — it remains a separate structured record for webhooks
+
 ## v3.3.0 — Match2Pay Full Rewrite
 
 ### Added

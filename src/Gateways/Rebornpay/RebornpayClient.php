@@ -5,7 +5,7 @@ namespace Subtain\LaravelPayments\Gateways\Rebornpay;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Subtain\LaravelPayments\PaymentLogger;
 use Subtain\LaravelPayments\Exceptions\PaymentException;
 
 /**
@@ -46,12 +46,12 @@ class RebornpayClient
     {
         $url = $this->url($endpoint);
 
-        Log::debug('Rebornpay API request', [
+        PaymentLogger::debug('api.request', [
             'method'   => 'POST',
             'endpoint' => $endpoint,
             'url'      => $url,
             'payload'  => $data,
-        ]);
+        ], gateway: 'rebornpay', category: 'api');
 
         $response = $this->request()->post($url, $data);
 
@@ -70,12 +70,12 @@ class RebornpayClient
     {
         $url = $this->url($endpoint);
 
-        Log::debug('Rebornpay API request', [
+        PaymentLogger::debug('api.request', [
             'method'   => 'GET',
             'endpoint' => $endpoint,
             'url'      => $url,
             'query'    => $query,
-        ]);
+        ], gateway: 'rebornpay', category: 'api');
 
         $response = $this->request()->get($url, $query);
 
@@ -131,12 +131,12 @@ class RebornpayClient
         if ($response->failed()) {
             $errorMessage = $this->extractErrorMessage($data);
 
-            Log::error('Rebornpay API error response', [
+            PaymentLogger::error('api.error', [
                 'endpoint'    => $endpoint,
                 'status_code' => $response->status(),
                 'message'     => $errorMessage,
                 'body'        => $data,
-            ]);
+            ], gateway: 'rebornpay', category: 'api');
 
             throw PaymentException::fromResponse(
                 gateway: 'rebornpay',
@@ -145,10 +145,10 @@ class RebornpayClient
             );
         }
 
-        Log::debug('Rebornpay API success response', [
+        PaymentLogger::debug('api.response', [
             'endpoint' => $endpoint,
             'body'     => $data,
-        ]);
+        ], gateway: 'rebornpay', category: 'api');
 
         return is_array($data) ? $data : [];
     }

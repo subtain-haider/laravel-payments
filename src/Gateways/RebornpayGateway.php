@@ -2,7 +2,7 @@
 
 namespace Subtain\LaravelPayments\Gateways;
 
-use Illuminate\Support\Facades\Log;
+use Subtain\LaravelPayments\PaymentLogger;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 use Subtain\LaravelPayments\DTOs\CheckoutResult;
@@ -105,23 +105,23 @@ class RebornpayGateway implements PaymentGateway
             'payment_option_name'   => $request->extra['payment_option'] ?? 'UPI',
         ];
 
-        Log::info('Rebornpay checkout initiated', [
+        PaymentLogger::info('checkout.initiated', [
             'invoice_id'            => $request->invoiceId,
             'amount'                => $payload['amount'],
             'currency'              => $payload['currency'],
             'client_transaction_id' => $payload['client_transaction_id'],
             'payment_option'        => $payload['payment_option_name'],
-        ]);
+        ], gateway: 'rebornpay', category: 'checkout');
 
         $data = $this->payin()->create($payload);
 
         $paymentPageUrl = (string) ($data['payment_page_url'] ?? '');
 
         if ($paymentPageUrl === '') {
-            Log::error('Rebornpay checkout returned empty payment_page_url', [
+            PaymentLogger::error('checkout.empty_url', [
                 'invoice_id' => $request->invoiceId,
                 'response'   => $data,
-            ]);
+            ], gateway: 'rebornpay', category: 'checkout');
 
             throw new PaymentException(
                 message: 'Rebornpay response missing payment_page_url.',
@@ -140,12 +140,12 @@ class RebornpayGateway implements PaymentGateway
             );
         }
 
-        Log::info('Rebornpay checkout successful', [
+        PaymentLogger::info('checkout.success', [
             'invoice_id'     => $request->invoiceId,
             'transaction_id' => $data['transaction_id'] ?? '',
             'payin_id'       => $data['payin_id'] ?? '',
             'expiry_time'    => $data['expiry_time'] ?? null,
-        ]);
+        ], gateway: 'rebornpay', category: 'checkout');
 
         return new CheckoutResult(
             redirectUrl:   $paymentPageUrl,
@@ -188,7 +188,7 @@ class RebornpayGateway implements PaymentGateway
 
         $status = $isFake ? PaymentStatus::FAILED : PaymentStatus::PAID;
 
-        Log::info('Rebornpay webhook parsed', [
+        PaymentLogger::info('webhook.parsed', [
             'postback_id'           => $payload['postback_id'] ?? null,
             'postback_is_fake'      => $isFake,
             'creation_type'         => $payload['creation_type'] ?? null,
@@ -197,7 +197,7 @@ class RebornpayGateway implements PaymentGateway
             'amount'                => $amount,
             'currency'              => $currency,
             'status'                => $status->value,
-        ]);
+        ], gateway: 'rebornpay', category: 'webhook');
 
         return new WebhookResult(
             status:        $status,
@@ -233,7 +233,9 @@ class RebornpayGateway implements PaymentGateway
     public function verifyWebhook(array $payload, array $headers = []): bool
     {
         if (empty($this->postbackKey)) {
-            Log::warning('Rebornpay webhook verification skipped: postback_key not configured');
+            PaymentLogger::warning('webhook.verification_skipped', [
+                'reason' => 'postback_key not configured',
+            ], gateway: 'rebornpay', category: 'webhook');
 
             return true;
         }
@@ -241,9 +243,9 @@ class RebornpayGateway implements PaymentGateway
         $valid = SignatureService::verify($payload, $this->postbackKey);
 
         if (! $valid) {
-            Log::warning('Rebornpay webhook signature verification failed', [
+            PaymentLogger::warning('webhook.signature_failed', [
                 'postback_id' => $payload['postback_id'] ?? null,
-            ]);
+            ], gateway: 'rebornpay', category: 'webhook');
         }
 
         return $valid;
@@ -261,7 +263,9 @@ class RebornpayGateway implements PaymentGateway
     public function verifyWebhookSignature(string $rawBody, array $headers = []): bool
     {
         if (empty($this->postbackKey)) {
-            Log::warning('Rebornpay webhook verification skipped: postback_key not configured');
+            PaymentLogger::warning('webhook.verification_skipped', [
+                'reason' => 'postback_key not configured',
+            ], gateway: 'rebornpay', category: 'webhook');
 
             return true;
         }
@@ -270,9 +274,10 @@ class RebornpayGateway implements PaymentGateway
         $valid   = SignatureService::verifyFromRawBody($rawBody, $this->postbackKey);
 
         if (! $valid) {
-            Log::warning('Rebornpay webhook signature verification failed (raw body check)', [
+            PaymentLogger::warning('webhook.signature_failed', [
                 'postback_id' => is_array($payload) ? ($payload['postback_id'] ?? null) : null,
-            ]);
+                'method'      => 'raw_body',
+            ], gateway: 'rebornpay', category: 'webhook');
         }
 
         return $valid;

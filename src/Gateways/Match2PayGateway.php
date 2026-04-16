@@ -2,7 +2,7 @@
 
 namespace Subtain\LaravelPayments\Gateways;
 
-use Illuminate\Support\Facades\Log;
+use Subtain\LaravelPayments\PaymentLogger;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 use Subtain\LaravelPayments\DTOs\CheckoutResult;
@@ -109,13 +109,13 @@ class Match2PayGateway implements PaymentGateway
             'paymentMethod'      => $request->extra['payment_method'] ?? 'CRYPTO_AGENT',
         ], fn ($value) => $value !== null && $value !== '');
 
-        Log::info('Match2Pay checkout initiated', [
+        PaymentLogger::info('checkout.initiated', [
             'invoice_id'          => $request->invoiceId,
             'amount'              => $data['amount'],
             'currency'            => $data['currency'],
             'payment_currency'    => $data['paymentCurrency'] ?? null,
             'payment_gateway'     => $data['paymentGatewayName'] ?? null,
-        ]);
+        ], gateway: 'match2pay', category: 'checkout');
 
         $response = $this->deposit()->create($data, $this->apiToken, $this->apiSecret);
 
@@ -123,10 +123,10 @@ class Match2PayGateway implements PaymentGateway
         $paymentId   = (string) ($response['paymentId'] ?? '');
 
         if ($checkoutUrl === '') {
-            Log::error('Match2Pay checkout returned empty checkoutUrl', [
+            PaymentLogger::error('checkout.empty_url', [
                 'invoice_id' => $request->invoiceId,
                 'response'   => $response,
-            ]);
+            ], gateway: 'match2pay', category: 'checkout');
 
             throw new PaymentException(
                 message: 'Match2Pay response missing checkoutUrl.',
@@ -135,12 +135,12 @@ class Match2PayGateway implements PaymentGateway
             );
         }
 
-        Log::info('Match2Pay checkout successful', [
+        PaymentLogger::info('checkout.success', [
             'invoice_id'  => $request->invoiceId,
             'payment_id'  => $paymentId,
             'status'      => $response['status'] ?? null,
             'expiration'  => $response['expiration'] ?? null,
-        ]);
+        ], gateway: 'match2pay', category: 'checkout');
 
         return new CheckoutResult(
             redirectUrl:   $checkoutUrl,
@@ -175,7 +175,7 @@ class Match2PayGateway implements PaymentGateway
         $finalAmount   = (float) ($payload['finalAmount'] ?? 0);
         $finalCurrency = (string) ($payload['finalCurrency'] ?? 'USD');
 
-        Log::info('Match2Pay webhook parsed', [
+        PaymentLogger::info('webhook.parsed', [
             'payment_id'           => $paymentId,
             'status'               => $payload['status'] ?? null,
             'mapped_status'        => $status->value,
@@ -183,7 +183,7 @@ class Match2PayGateway implements PaymentGateway
             'transaction_currency' => $payload['transactionCurrency'] ?? null,
             'final_amount'         => $finalAmount,
             'final_currency'       => $finalCurrency,
-        ]);
+        ], gateway: 'match2pay', category: 'webhook');
 
         return new WebhookResult(
             status:        $status,
@@ -221,7 +221,9 @@ class Match2PayGateway implements PaymentGateway
     public function verifyWebhook(array $payload, array $headers = []): bool
     {
         if (empty($this->apiSecret)) {
-            Log::warning('Match2Pay webhook verification skipped: secret not configured');
+            PaymentLogger::warning('webhook.verification_skipped', [
+                'reason' => 'secret not configured',
+            ], gateway: 'match2pay', category: 'webhook');
 
             return true;
         }
@@ -236,9 +238,9 @@ class Match2PayGateway implements PaymentGateway
         $signature = $this->extractSignatureFromHeaders($headers);
 
         if ($signature === '') {
-            Log::warning('Match2Pay DONE callback received without signature header', [
+            PaymentLogger::warning('webhook.missing_signature', [
                 'payment_id' => $payload['paymentId'] ?? null,
-            ]);
+            ], gateway: 'match2pay', category: 'webhook');
 
             return false;
         }
@@ -253,9 +255,9 @@ class Match2PayGateway implements PaymentGateway
         );
 
         if (! $valid) {
-            Log::warning('Match2Pay webhook signature verification failed', [
+            PaymentLogger::warning('webhook.signature_failed', [
                 'payment_id' => $payload['paymentId'] ?? null,
-            ]);
+            ], gateway: 'match2pay', category: 'webhook');
         }
 
         return $valid;

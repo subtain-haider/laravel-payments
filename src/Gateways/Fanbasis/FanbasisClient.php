@@ -3,6 +3,7 @@
 namespace Subtain\LaravelPayments\Gateways\Fanbasis;
 
 use Illuminate\Support\Facades\Http;
+use Subtain\LaravelPayments\PaymentLogger;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Subtain\LaravelPayments\Exceptions\PaymentException;
@@ -38,9 +39,15 @@ class FanbasisClient
      */
     public function get(string $endpoint, array $query = []): array
     {
+        PaymentLogger::debug('api.request', [
+            'method'   => 'GET',
+            'endpoint' => $endpoint,
+            'query'    => $query,
+        ], gateway: 'fanbasis', category: 'api');
+
         $response = $this->request()->get($this->url($endpoint), $query);
 
-        return $this->parseResponse($response);
+        return $this->parseResponse($response, $endpoint);
     }
 
     /**
@@ -51,9 +58,14 @@ class FanbasisClient
      */
     public function post(string $endpoint, array $data = []): array
     {
+        PaymentLogger::debug('api.request', [
+            'method'   => 'POST',
+            'endpoint' => $endpoint,
+        ], gateway: 'fanbasis', category: 'api');
+
         $response = $this->request()->post($this->url($endpoint), $data);
 
-        return $this->parseResponse($response);
+        return $this->parseResponse($response, $endpoint);
     }
 
     /**
@@ -64,9 +76,14 @@ class FanbasisClient
      */
     public function put(string $endpoint, array $data = []): array
     {
+        PaymentLogger::debug('api.request', [
+            'method'   => 'PUT',
+            'endpoint' => $endpoint,
+        ], gateway: 'fanbasis', category: 'api');
+
         $response = $this->request()->put($this->url($endpoint), $data);
 
-        return $this->parseResponse($response);
+        return $this->parseResponse($response, $endpoint);
     }
 
     /**
@@ -76,9 +93,14 @@ class FanbasisClient
      */
     public function delete(string $endpoint): array
     {
+        PaymentLogger::debug('api.request', [
+            'method'   => 'DELETE',
+            'endpoint' => $endpoint,
+        ], gateway: 'fanbasis', category: 'api');
+
         $response = $this->request()->delete($this->url($endpoint));
 
-        return $this->parseResponse($response);
+        return $this->parseResponse($response, $endpoint);
     }
 
     /**
@@ -116,9 +138,15 @@ class FanbasisClient
      *
      * @throws PaymentException
      */
-    protected function parseResponse(Response $response): array
+    protected function parseResponse(Response $response, string $endpoint = ''): array
     {
         if ($response->failed()) {
+            PaymentLogger::error('api.error', [
+                'endpoint'    => $endpoint,
+                'status_code' => $response->status(),
+                'body'        => $response->body(),
+            ], gateway: 'fanbasis', category: 'api');
+
             throw PaymentException::fromResponse(
                 gateway: 'fanbasis',
                 body: $response->body(),
@@ -129,12 +157,23 @@ class FanbasisClient
         $data = $response->json();
 
         if (($data['status'] ?? '') === 'error') {
+            PaymentLogger::error('api.error', [
+                'endpoint' => $endpoint,
+                'message'  => $data['message'] ?? 'Unknown error',
+                'body'     => $data,
+            ], gateway: 'fanbasis', category: 'api');
+
             throw new PaymentException(
                 message: 'Fanbasis API error: ' . ($data['message'] ?? 'Unknown error'),
                 gateway: 'fanbasis',
                 raw: $data,
             );
         }
+
+        PaymentLogger::debug('api.response', [
+            'endpoint'    => $endpoint,
+            'status_code' => $response->status(),
+        ], gateway: 'fanbasis', category: 'api');
 
         return $data;
     }

@@ -179,6 +179,69 @@ Payment::gateway('rebornpay')->checkout(new CheckoutRequest(
 
 ---
 
+## Logging
+
+All log output from every gateway, HTTP client, webhook handler, and service flows through a single central class — `PaymentLogger`. You control where logs go, at what level, and what sensitive data is masked, all from `config/payments.php`.
+
+**Zero configuration required.** Out of the box, the package logs to the same channel as the rest of your application.
+
+### Quick Setup
+
+```php
+// config/payments.php
+'logging' => [
+    'enabled' => true,
+    'level'   => env('PAYMENTS_LOG_LEVEL', 'info'),  // 'debug' in local, 'info' in prod
+    'channels' => [
+        'default' => env('PAYMENTS_LOG_CHANNEL', null),  // null = app's default channel
+        // 'match2pay'  => 'slack',        // route a gateway to Slack
+        // 'rebornpay'  => 'telegram',     // or Telegram
+        // 'fanbasis'   => 'clickhouse',   // or ClickHouse
+        // 'default'    => 'payments',     // or a dedicated file
+    ],
+    'levels' => [
+        // 'match2pay' => 'debug',  // per-gateway level override
+    ],
+    'redact' => [
+        'api_key', 'api_token', 'secret', 'signature', 'password', 'token',
+        // add any sensitive fields from your custom gateways
+    ],
+],
+```
+
+### Log message format
+
+Every entry is prefixed for easy filtering:
+
+```
+[payments:match2pay:checkout] checkout.initiated
+[payments:fanbasis:api] api.error
+[payments:rebornpay:webhook] webhook.signature_failed
+```
+
+### What gets logged
+
+| Category | Events |
+|---|---|
+| `checkout` | initiated, success, empty_url, http_error, gateway_error |
+| `webhook` | parsed, verification_skipped, missing_signature, signature_failed |
+| `api` | request (debug), response (debug), error, exception |
+
+### Custom gateways
+
+Use `PaymentLogger` in your own gateway implementations so they respect the same routing and level config:
+
+```php
+use Subtain\LaravelPayments\PaymentLogger;
+
+PaymentLogger::info('checkout.initiated', ['invoice_id' => $id], gateway: 'stripe', category: 'checkout');
+PaymentLogger::error('checkout.failed',   ['error' => $e->getMessage()], gateway: 'stripe');
+```
+
+**[→ Full logging documentation](docs/logging.md)** — all config options, recipes for Slack, Telegram, DB, ClickHouse, custom redaction, channel resolution logic, and how to use `PaymentLogger` in your own gateway.
+
+---
+
 ## Core Features
 
 ### Payment Model

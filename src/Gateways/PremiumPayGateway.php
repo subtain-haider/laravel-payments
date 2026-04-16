@@ -3,6 +3,7 @@
 namespace Subtain\LaravelPayments\Gateways;
 
 use Illuminate\Support\Facades\Http;
+use Subtain\LaravelPayments\PaymentLogger;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 use Subtain\LaravelPayments\DTOs\CheckoutResult;
@@ -52,11 +53,23 @@ class PremiumPayGateway implements PaymentGateway
             'callbackurl'        => $request->webhookUrl,
         ];
 
+        PaymentLogger::info('checkout.initiated', [
+            'invoice_id' => $request->invoiceId,
+            'amount'     => $request->amount,
+            'currency'   => $request->currency,
+        ], gateway: 'premiumpay', category: 'checkout');
+
         $response = Http::asJson()
             ->withToken($this->apiKey)
             ->post("{$this->baseUrl}/makepayment", $payload);
 
         if ($response->failed()) {
+            PaymentLogger::error('checkout.http_error', [
+                'invoice_id'  => $request->invoiceId,
+                'status_code' => $response->status(),
+                'body'        => $response->body(),
+            ], gateway: 'premiumpay', category: 'checkout');
+
             throw PaymentException::fromResponse(
                 gateway: $this->name(),
                 body: $response->body(),
@@ -67,12 +80,24 @@ class PremiumPayGateway implements PaymentGateway
         $data = $response->json();
 
         if (isset($data['status']) && $data['status'] !== 'ok') {
+            PaymentLogger::error('checkout.gateway_error', [
+                'invoice_id' => $request->invoiceId,
+                'message'    => $data['message'] ?? 'unknown',
+                'status'     => $data['status'] ?? null,
+            ], gateway: 'premiumpay', category: 'checkout');
+
             throw new PaymentException(
                 message: 'PremiumPay returned an error: ' . ($data['message'] ?? 'unknown'),
                 gateway: $this->name(),
                 raw: $data,
             );
         }
+
+        PaymentLogger::info('checkout.success', [
+            'invoice_id'     => $request->invoiceId,
+            'payment_id'     => $data['paymentId'] ?? null,
+            'redirect_url'   => $data['paymentUrl'] ?? $data['redirectUrl'] ?? null,
+        ], gateway: 'premiumpay', category: 'checkout');
 
         return new CheckoutResult(
             redirectUrl: $data['paymentUrl'] ?? $data['redirectUrl'] ?? '',
@@ -85,6 +110,13 @@ class PremiumPayGateway implements PaymentGateway
     public function parseWebhook(array $payload): WebhookResult
     {
         $status = $this->mapStatus($payload['status'] ?? '');
+
+        PaymentLogger::info('webhook.parsed', [
+            'invoice_id'  => $payload['clientOrderId'] ?? null,
+            'payment_id'  => $payload['paymentId'] ?? null,
+            'status'      => $payload['status'] ?? null,
+            'mapped_status' => $status->value,
+        ], gateway: 'premiumpay', category: 'webhook');
 
         return new WebhookResult(
             status: $status,

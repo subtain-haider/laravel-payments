@@ -5,7 +5,7 @@ namespace Subtain\LaravelPayments\Gateways\Match2Pay;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Subtain\LaravelPayments\PaymentLogger;
 use Subtain\LaravelPayments\Exceptions\PaymentException;
 
 /**
@@ -56,32 +56,32 @@ class Match2PayClient
      */
     public function post(string $path, array $payload): array
     {
-        Log::debug('Match2Pay API request', [
+        PaymentLogger::debug('api.request', [
             'method'   => 'POST',
             'endpoint' => $path,
             'payload'  => $this->redactSensitive($payload),
-        ]);
+        ], gateway: 'match2pay', category: 'api');
 
         try {
             $response = $this->buildHttpClient()->post($path, $payload);
 
             $body = $response->json() ?? [];
 
-            Log::debug('Match2Pay API response', [
+            PaymentLogger::debug('api.response', [
                 'endpoint'    => $path,
                 'status_code' => $response->status(),
                 'body'        => $body,
-            ]);
+            ], gateway: 'match2pay', category: 'api');
 
             if ($response->failed()) {
                 $message = $this->extractErrorMessage($body);
 
-                Log::error('Match2Pay API error', [
+                PaymentLogger::error('api.error', [
                     'endpoint'    => $path,
                     'status_code' => $response->status(),
                     'message'     => $message,
                     'body'        => $body,
-                ]);
+                ], gateway: 'match2pay', category: 'api');
 
                 throw new PaymentException(
                     message: $message,
@@ -92,10 +92,10 @@ class Match2PayClient
 
             return $body;
         } catch (RequestException $e) {
-            Log::error('Match2Pay HTTP request exception', [
+            PaymentLogger::error('api.exception', [
                 'endpoint'  => $path,
                 'exception' => $e->getMessage(),
-            ]);
+            ], gateway: 'match2pay', category: 'api');
 
             throw new PaymentException(
                 message: 'Match2Pay request failed: ' . $e->getMessage(),
