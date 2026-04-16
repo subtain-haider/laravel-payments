@@ -12,10 +12,11 @@ class Payment extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'status'   => PaymentStatus::class,
-        'amount'   => 'float',
-        'metadata' => 'array',
-        'paid_at'  => 'datetime',
+        'status'     => PaymentStatus::class,
+        'amount'     => 'float',
+        'metadata'   => 'array',
+        'paid_at'    => 'datetime',
+        'is_sandbox' => 'boolean',
     ];
 
     public function __construct(array $attributes = [])

@@ -10,9 +10,10 @@ class PaymentLog extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'payload'  => 'array',
-        'headers'  => 'array',
-        'metadata' => 'array',
+        'payload'    => 'array',
+        'headers'    => 'array',
+        'metadata'   => 'array',
+        'is_sandbox' => 'boolean',
     ];
 
     public function __construct(array $attributes = [])
@@ -30,7 +31,9 @@ class PaymentLog extends Model
     }
 
     /**
-     * Create a log entry for a webhook received.
+     * Create a log entry for a webhook or internal payment event.
+     *
+     * @param  bool  $isSandbox  Whether this log entry belongs to a sandboxed (simulated) payment.
      */
     public static function logWebhook(
         ?int $paymentId,
@@ -39,6 +42,7 @@ class PaymentLog extends Model
         array $payload,
         array $headers = [],
         ?string $status = null,
+        bool $isSandbox = false,
     ): self {
         return static::create([
             'payment_id' => $paymentId,
@@ -47,6 +51,7 @@ class PaymentLog extends Model
             'status'     => $status,
             'payload'    => $payload,
             'headers'    => $headers,
+            'is_sandbox' => $isSandbox,
         ]);
     }
 }

@@ -142,6 +142,120 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Sandbox Mode
+    |--------------------------------------------------------------------------
+    |
+    | Sandbox mode lets you run the full payment flow without charging real
+    | money. When a gateway (or a specific user) is sandboxed:
+    |
+    |   - The real gateway API is NOT called.
+    |   - A SandboxGateway returns a simulated CheckoutResult instantly.
+    |   - The lp_payments record is created with is_sandbox = true.
+    |   - Every lp_payment_logs entry is created with is_sandbox = true.
+    |   - All events (PaymentSucceeded, etc.) fire exactly as they would in prod.
+    |   - A sandbox-confirm endpoint lets QA trigger the success webhook manually.
+    |
+    | This lets local and staging environments run the complete purchase flow —
+    | DB records, logs, events, downstream listeners — without any real payment.
+    |
+    | ── Point 2: Environment-level sandbox ─────────────────────────────────
+    |
+    | Set PAYMENTS_SANDBOX=true and the entire payment layer goes into sandbox
+    | mode. Optionally restrict it to specific gateways via PAYMENTS_SANDBOX_GATEWAYS.
+    |
+    |   PAYMENTS_SANDBOX=true
+    |   PAYMENTS_SANDBOX_GATEWAYS=*                  — all gateways
+    |   PAYMENTS_SANDBOX_GATEWAYS=fanbasis,match2pay  — only those two
+    |
+    | ── Point 3: Per-user / per-role bypass ────────────────────────────────
+    |
+    | Specific user IDs or roles always bypass real payment regardless of
+    | whether sandbox mode is enabled globally. Useful for internal QA accounts
+    | that must work on production without paying.
+    |
+    |   'bypass_user_ids' => [1, 42],
+    |   'bypass_roles'    => ['admin', 'qa_tester'],
+    |
+    | To resolve roles the package calls $user->getRoleNames() (spatie/laravel-permission)
+    | if available, then falls back to $user->roles (relationship), then $user->role
+    | (plain string column). Override entirely via the 'role_resolver' callable.
+    |
+    | ── Sandbox confirm endpoint ────────────────────────────────────────────
+    |
+    | Since sandboxed payments never receive a real webhook, QA needs a way to
+    | simulate "payment confirmed". The package registers:
+    |
+    |   GET {webhook_path}/sandbox/confirm/{invoice_id}
+    |
+    | This endpoint is only active when sandbox.enabled = true OR the app
+    | environment is local/testing. It fires PaymentSucceeded exactly like a
+    | real webhook would. The endpoint hard-rejects any invoice whose DB record
+    | has is_sandbox = false — so real payments can never be confirmed here,
+    | even if sandbox mode is toggled on after the fact.
+    |
+    */
+
+    'sandbox' => [
+
+        /*
+        | Master switch. Set PAYMENTS_SANDBOX=true on local/staging .env files.
+        | On production this should always be false (or simply not set).
+        */
+        'enabled' => env('PAYMENTS_SANDBOX', false),
+
+        /*
+        | Which gateways run in sandbox mode.
+        |
+        | '*'   — all configured gateways are sandboxed (default when enabled).
+        | CSV   — only the listed gateways: 'fanbasis,match2pay'
+        |
+        | Gateways not listed here will still make real API calls even when
+        | sandbox.enabled = true. This lets you sandbox one gateway at a time.
+        */
+        'gateways' => env('PAYMENTS_SANDBOX_GATEWAYS', '*'),
+
+        /*
+        | Specific user IDs that always bypass real payment, on any environment.
+        | These users go through the sandbox path even on production.
+        |
+        | Example: [1, 42, 100]
+        */
+        'bypass_user_ids' => [],
+
+        /*
+        | Roles/guards that always bypass real payment, on any environment.
+        | Any user whose role matches one of these strings is sandboxed.
+        |
+        | Example: ['admin', 'qa_tester', 'internal']
+        */
+        'bypass_roles' => [],
+
+        /*
+        | Optional callable to resolve a user's roles for bypass_roles checks.
+        |
+        | Signature: fn(\Illuminate\Contracts\Auth\Authenticatable $user): array
+        | Must return an array of role name strings.
+        |
+        | When null the package uses its built-in resolver which tries:
+        |   1. $user->getRoles()                 (spatie/laravel-permission style)
+        |   2. $user->roles->pluck('name')        (hasMany relationship)
+        |   3. [$user->role]                      (plain string column)
+        */
+        'role_resolver' => null,
+
+        /*
+        | The URL the SandboxGateway returns as the "checkout redirect".
+        | The user is sent here instead of a real payment page.
+        |
+        | Use a route in your app that explains this is a sandboxed payment,
+        | or just point to your standard success page for seamless QA.
+        */
+        'redirect_url' => env('PAYMENTS_SANDBOX_REDIRECT_URL', '/sandbox/payment-pending'),
+
+    ],
+
     'logging' => [
 
         /*

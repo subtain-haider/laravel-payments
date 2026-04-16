@@ -2,13 +2,16 @@
 
 namespace Subtain\LaravelPayments;
 
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Subtain\LaravelPayments\DTOs\CheckoutRequest;
 use Subtain\LaravelPayments\DTOs\CheckoutResult;
 use Subtain\LaravelPayments\Enums\PaymentStatus;
 use Subtain\LaravelPayments\Facades\Payment;
+use Subtain\LaravelPayments\Gateways\SandboxGateway;
 use Subtain\LaravelPayments\Models\Payment as PaymentModel;
 use Subtain\LaravelPayments\Models\PaymentLog;
-use Illuminate\Database\Eloquent\Model;
+use Subtain\LaravelPayments\PaymentLogger;
 
 /**
  * High-level payment orchestration.
@@ -16,22 +19,40 @@ use Illuminate\Database\Eloquent\Model;
  * Wraps gateway calls with DB persistence so the consuming app
  * doesn't have to manage payment records manually.
  *
+ * Sandbox support is built in. When the SandboxResolver determines a payment
+ * should be sandboxed (via environment config or per-user/role bypass), the
+ * real gateway is replaced with SandboxGateway transparently. All DB records,
+ * logs, and events fire identically — only the real API call is skipped.
+ * Sandboxed records are flagged with is_sandbox = true.
+ *
  * Usage:
  *   $service = app(PaymentService::class);
  *   $result  = $service->initiate('premiumpay', $checkoutRequest, $order);
+ *
+ *   // With authenticated user for per-user/role sandbox bypass:
+ *   $result = $service->initiate('premiumpay', $checkoutRequest, $order, $user);
  */
 class PaymentService
 {
+    public function __construct(private readonly SandboxResolver $sandboxResolver) {}
+
     /**
      * Initiate a payment: create DB record → call gateway → update record → return result.
      *
-     * @param  string           $gateway   Gateway name (fanbasis, premiumpay, match2pay, etc.)
-     * @param  CheckoutRequest  $request   Gateway-agnostic checkout data
-     * @param  Model|null       $payable   Optional Eloquent model this payment belongs to
+     * @param  string                   $gateway   Gateway name (fanbasis, premiumpay, match2pay, etc.)
+     * @param  CheckoutRequest          $request   Gateway-agnostic checkout data
+     * @param  Model|null               $payable   Optional Eloquent model this payment belongs to
+     * @param  Authenticatable|null     $user      Authenticated user, used for per-user/role sandbox bypass
      */
-    public function initiate(string $gateway, CheckoutRequest $request, ?Model $payable = null): CheckoutResult
-    {
-        // 1. Create payment record
+    public function initiate(
+        string $gateway,
+        CheckoutRequest $request,
+        ?Model $payable = null,
+        ?Authenticatable $user = null,
+    ): CheckoutResult {
+        $isSandbox = $this->sandboxResolver->shouldSandbox($gateway, $user);
+
+        // 1. Create payment record (flagged if sandboxed)
         $payment = new PaymentModel([
             'gateway'        => $gateway,
             'invoice_id'     => $request->invoiceId ?: $this->generateInvoiceId(),
@@ -45,12 +66,13 @@ class PaymentService
             'cancel_url'     => $request->cancelUrl,
             'webhook_url'    => $request->webhookUrl,
             'metadata'       => $request->metadata,
+            'is_sandbox'     => $isSandbox,
         ]);
 
         // Associate with payable model if provided
         if ($payable) {
             $payment->payable_type = get_class($payable);
-            $payment->payable_id = $payable->getKey();
+            $payment->payable_id   = $payable->getKey();
         }
 
         $payment->save();
@@ -74,17 +96,31 @@ class PaymentService
             );
         }
 
-        // 2. Log checkout initiation
+        // 2. Log checkout initiation (flagged if sandboxed)
         PaymentLog::logWebhook(
             paymentId: $payment->id,
             gateway: $gateway,
             event: 'checkout_initiated',
             payload: $request->toArray(),
+            isSandbox: $isSandbox,
         );
 
-        // 3. Call gateway
+        // 3. Call gateway (real or sandbox)
+        if ($isSandbox) {
+            PaymentLogger::info('sandbox.intercepted', [
+                'invoice_id' => $payment->invoice_id,
+                'gateway'    => $gateway,
+                'sandbox'    => true,
+                'reason'     => 'Payment intercepted by sandbox mode — real gateway will not be called',
+            ], gateway: $gateway, category: 'checkout');
+        }
+
+        $gatewayDriver = $isSandbox
+            ? new SandboxGateway(originalGateway: $gateway)
+            : Payment::gateway($gateway);
+
         try {
-            $result = Payment::gateway($gateway)->checkout($request);
+            $result = $gatewayDriver->checkout($request);
         } catch (\Throwable $e) {
             $payment->update(['status' => PaymentStatus::FAILED]);
 
@@ -94,6 +130,7 @@ class PaymentService
                 event: 'checkout_failed',
                 payload: ['error' => $e->getMessage()],
                 status: 'failed',
+                isSandbox: $isSandbox,
             );
 
             throw $e;

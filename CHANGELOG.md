@@ -1,5 +1,65 @@
 # Changelog
 
+## v4.1.0 — Sandbox Mode
+
+### Added
+
+- **Sandbox mode** — run the full payment flow on local/staging without charging real money. All DB records, logs, events, and listeners fire identically to production; only the real PSP API call is skipped. Sandboxed records are flagged with `is_sandbox = true` for easy filtering.
+
+- **`SandboxGateway`** — transparent drop-in that implements `PaymentGateway`. Returns an instant `CheckoutResult` with a deterministic fake transaction ID (`sandbox_{invoiceId}_{timestamp}`) and a configurable redirect URL. Logs via `PaymentLogger` using the same event names as real gateways (`checkout.initiated`, `checkout.success`, `webhook.parsed`) so channel routing and level filtering work identically.
+
+- **`SandboxResolver`** — pure decision class injected into `PaymentService`. A payment is sandboxed when any of these conditions is true:
+  1. `sandbox.enabled = true` AND the gateway is in `sandbox.gateways`
+  2. The user's ID is in `sandbox.bypass_user_ids` (any environment, including prod)
+  3. The user's role matches `sandbox.bypass_roles` (any environment, including prod)
+
+- **Role resolution** — primary strategy is `$user->getRoleNames()` (spatie/laravel-permission). Falls back to a `roles` hasMany relationship, then a plain `role` string column. Fully overridable via `sandbox.role_resolver` callable.
+
+- **`sandbox.gateways`** config — `'*'` sandboxes all gateways (default when enabled). CSV string (`'fanbasis,match2pay'`) sandboxes only the named gateways; others continue making real API calls.
+
+- **`is_sandbox` column** — added to `lp_payments` and `lp_payment_logs`. New install migration stubs include it. Existing installs: publish and run the new addendum stub.
+
+- **Sandbox confirm endpoint** — `GET {webhook_path}/sandbox/confirm/{invoice_id}`. Simulates a payment confirmation: marks the payment as paid, fires `PaymentSucceeded` and `WebhookReceived` events. Only active when `sandbox.enabled = true` OR the app environment is `local`/`testing`. Hard-rejects any invoice whose DB record has `is_sandbox = false` — real payments cannot be confirmed even if sandbox mode is later enabled.
+
+- **`PaymentService::initiate()` `$user` parameter** — new optional fourth argument for passing the authenticated user. Enables per-user/role bypass. Fully backwards-compatible — existing calls without `$user` are unaffected.
+
+- **`SandboxController`** — full `PaymentLogger` coverage on every outcome: not found (warning), real-payment rejection (error), invalid status transition (error), successful confirm (info).
+
+- **Addendum migration stub** — `add_sandbox_to_payments_tables.php.stub`, publishable via `--tag=payments-sandbox-migration`. Guards with `hasColumn()` so it is safe to run on any existing install.
+
+### Non-breaking
+
+- `PaymentService` constructor now receives `SandboxResolver` via DI — existing `app(PaymentService::class)` calls are unaffected; Laravel resolves it automatically.
+- When `sandbox.enabled = false` and no user bypass is configured, `SandboxResolver::shouldSandbox()` returns `false` immediately — zero overhead on production.
+- Sandbox config keys default to safe values: `enabled = false`, `gateways = '*'`, empty bypass lists.
+
+### Upgrade guide
+
+**New installs:** no action needed — `is_sandbox` is included in the base migration stubs.
+
+**Existing installs (already ran migrations):**
+```bash
+php artisan vendor:publish --tag=payments-sandbox-migration
+php artisan migrate
+```
+
+**Enable sandbox on local/staging `.env`:**
+```
+PAYMENTS_SANDBOX=true
+PAYMENTS_SANDBOX_GATEWAYS=*
+PAYMENTS_SANDBOX_REDIRECT_URL=/checkout/pending
+```
+
+**Per-user/role bypass (in published `config/lp_payments.php`):**
+```php
+'sandbox' => [
+    'bypass_user_ids' => [1, 42],
+    'bypass_roles'    => ['admin', 'qa_tester'],
+],
+```
+
+---
+
 ## v4.0.0 — Config Key Renamed to Avoid Conflicts (Breaking)
 
 ### Breaking Changes

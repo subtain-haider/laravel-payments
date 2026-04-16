@@ -27,6 +27,7 @@ class PaymentServiceProvider extends ServiceProvider
             return $app->make('payment')->gateway();
         });
 
+        $this->app->singleton(SandboxResolver::class);
         $this->app->singleton(PaymentService::class);
         $this->app->singleton(DiscountService::class);
 
@@ -73,6 +74,12 @@ class PaymentServiceProvider extends ServiceProvider
             __DIR__ . '/../database/migrations/create_discount_code_usages_table.php.stub'
                 => database_path('migrations/' . date('Y_m_d_His', time() + 3) . '_create_discount_code_usages_table.php'),
         ], 'payments-migrations');
+
+        // Publish addendum migration (for existing installs upgrading to sandbox support)
+        $this->publishes([
+            __DIR__ . '/../database/migrations/add_sandbox_to_payments_tables.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time()) . '_add_sandbox_to_payments_tables.php'),
+        ], 'payments-sandbox-migration');
 
         // Load webhook routes
         $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');

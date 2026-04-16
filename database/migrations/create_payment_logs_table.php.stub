@@ -23,6 +23,9 @@ return new class extends Migration
             $table->json('headers')->nullable();
             $table->json('metadata')->nullable();
 
+            // Sandbox flag — true when this log entry belongs to a simulated payment
+            $table->boolean('is_sandbox')->default(false);
+
             $table->timestamps();
 
             // Indexes

@@ -1,0 +1,56 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Addendum migration for existing installs upgrading to sandbox support.
+ *
+ * If you ran the original package migrations before sandbox mode was added,
+ * publish and run this migration to add the is_sandbox column to both tables:
+ *
+ *   php artisan vendor:publish --tag=payments-migrations
+ *   php artisan migrate
+ *
+ * New installs do not need this — is_sandbox is already in the base stubs.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        $paymentsTable     = config('lp_payments.tables.payments', 'lp_payments');
+        $paymentLogsTable  = config('lp_payments.tables.payment_logs', 'lp_payment_logs');
+
+        if (Schema::hasTable($paymentsTable) && ! Schema::hasColumn($paymentsTable, 'is_sandbox')) {
+            Schema::table($paymentsTable, function (Blueprint $table) {
+                // Sandbox flag — true when this payment was simulated (no real charge made).
+                // Filter these out of revenue reports with: where('is_sandbox', false)
+                $table->boolean('is_sandbox')->default(false)->after('gateway_response');
+                $table->index('is_sandbox');
+            });
+        }
+
+        if (Schema::hasTable($paymentLogsTable) && ! Schema::hasColumn($paymentLogsTable, 'is_sandbox')) {
+            Schema::table($paymentLogsTable, function (Blueprint $table) {
+                // Sandbox flag — true when this log entry belongs to a simulated payment.
+                $table->boolean('is_sandbox')->default(false)->after('metadata');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        $paymentsTable    = config('lp_payments.tables.payments', 'lp_payments');
+        $paymentLogsTable = config('lp_payments.tables.payment_logs', 'lp_payment_logs');
+
+        Schema::table($paymentsTable, function (Blueprint $table) {
+            $table->dropIndex(['is_sandbox']);
+            $table->dropColumn('is_sandbox');
+        });
+
+        Schema::table($paymentLogsTable, function (Blueprint $table) {
+            $table->dropColumn('is_sandbox');
+        });
+    }
+};
