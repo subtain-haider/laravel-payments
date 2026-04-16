@@ -100,6 +100,16 @@ return [
             'hash_algo' => 'sha384',
         ],
 
+        'rebornpay' => [
+            'driver'       => \Subtain\LaravelPayments\Gateways\RebornpayGateway::class,
+            'base_url'     => env('REBORNPAY_BASE_URL', 'https://prod.api.rbpcloud.pro'),
+            'api_key'      => env('REBORNPAY_API_KEY'),
+            'client_id'    => env('REBORNPAY_CLIENT_ID'),
+            'postback_key' => env('REBORNPAY_CLIENT_POSTBACK_KEY'),
+            'timeout'      => (int) env('REBORNPAY_TIMEOUT', 30),
+            'retries'      => (int) env('REBORNPAY_RETRIES', 2),
+        ],
+
     ],
 
 ];

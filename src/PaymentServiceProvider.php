@@ -5,6 +5,7 @@ namespace Subtain\LaravelPayments;
 use Illuminate\Support\ServiceProvider;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\Gateways\Fanbasis\FanbasisClient;
+use Subtain\LaravelPayments\Gateways\Rebornpay\RebornpayClient;
 
 class PaymentServiceProvider extends ServiceProvider
 {
@@ -33,6 +34,13 @@ class PaymentServiceProvider extends ServiceProvider
             $config = $app['config']->get('payments.gateways.fanbasis', []);
 
             return new FanbasisClient($config);
+        });
+
+        // Register RebornpayClient as a singleton for direct DI usage
+        $this->app->singleton(RebornpayClient::class, function ($app) {
+            $config = $app['config']->get('payments.gateways.rebornpay', []);
+
+            return new RebornpayClient($config);
         });
     }
 

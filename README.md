@@ -26,6 +26,7 @@ Every payment gateway has its own API, webhook format, and quirks. This package 
 | **[Fanbasis](docs/gateways/fanbasis.md)** | Cards, MoR | Dynamic, Embedded, Static, Subscriptions | 12 event types, HMAC-SHA256 | Customers, Subscribers, Discount Codes, Products, Transactions, Refunds, Webhooks | [Full docs →](docs/gateways/fanbasis.md) |
 | **PremiumPay** | Cards | API checkout | Callback-based | Checkout only | See below |
 | **Match2Pay** | Crypto (USDT, BTC, etc.) | API checkout | SHA-384 signature | Checkout only | See below |
+| **[Rebornpay](docs/gateways/rebornpay.md)** | UPI / IMPS (India) | API checkout | MD5 + Python-repr signature | Pay-in, Transaction status, UTR storage | [Full docs →](docs/gateways/rebornpay.md) |
 | *Your gateway* | *Any* | *Implement `PaymentGateway`* | *Your logic* | *Your logic* | [Add a gateway →](#add-a-custom-gateway) |
 
 > More PSPs are coming. Each gateway gets a full dedicated implementation as we add it. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -46,7 +47,7 @@ php artisan migrate
 ### 1. Set your gateway credentials
 
 ```env
-PAYMENT_GATEWAY=fanbasis          # or premiumpay, match2pay, your-custom-gateway
+PAYMENT_GATEWAY=fanbasis          # or premiumpay, match2pay, rebornpay, your-custom-gateway
 
 # Each gateway has its own env vars — see the gateway docs
 FANBASIS_API_KEY=your-key
@@ -150,6 +151,22 @@ Payment::gateway('match2pay')->checkout(new CheckoutRequest(
     extra: ['payment_currency' => 'USX', 'payment_gateway_name' => 'USDT TRC20'],
 ));
 ```
+
+### Rebornpay (UPI / IMPS — India)
+
+Indian UPI and IMPS payments. Amounts should be sent in INR.
+
+```php
+Payment::gateway('rebornpay')->checkout(new CheckoutRequest(
+    amount:       92000.00,        // INR amount
+    currency:     'INR',
+    invoiceId:    'order_123',     // used for webhook reconciliation
+    customerName: 'Raj Kumar',
+    successUrl:   'https://app.com/payment/success',
+));
+```
+
+**[→ Full Rebornpay documentation](docs/gateways/rebornpay.md)** — checkout, INR conversion, IMPS, transaction status checks, UTR storage, signature verification.
 
 ---
 

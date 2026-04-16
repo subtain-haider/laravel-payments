@@ -8,6 +8,8 @@
         "fanbasis",
         "premiumpay",
         "match2pay",
+        "rebornpay",
+        "upi",
         "checkout",
         "webhooks"
     ],

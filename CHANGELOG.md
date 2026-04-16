@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.2.0 — Rebornpay (UPI) Gateway
+
+### Added
+- **`RebornpayGateway`** — Full UPI/IMPS payment gateway for Indian payments
+- **`RebornpayClient`** — Authenticated HTTP client with `X-API-Key` header, retry logic (429/5xx), structured debug/error logging
+- **`PayinService`** — Creates pay-in transactions (`POST /api/v1/external/payin`)
+- **`TransactionService`** — Status checks by transaction ID, client transaction ID, or UTR; UTR storage API
+- **`SignatureService`** — Rebornpay's custom MD5 signature algorithm (Python `repr()` + alphabetical key sort + URL-encoding). Includes `verifyFromRawBody()` which detects float keys in raw JSON to prevent precision loss (e.g. `2000.0` vs `2000`) during signature computation
+- `verifyWebhookSignature(string $rawBody)` method on `RebornpayGateway` — use instead of `verifyWebhook()` for accurate float handling
+- `extra['amount_override']` — pass a pre-converted INR amount without affecting the USD amount stored in the payment record
+- `extra['payment_option']` — switch between `'UPI'` (default) and `'IMPS'`
+- `RebornpayClient` registered as singleton in container
+- New config keys: `rebornpay.api_key`, `rebornpay.client_id`, `rebornpay.postback_key`, `rebornpay.base_url`, `rebornpay.timeout`, `rebornpay.retries`
+- `docs/gateways/rebornpay.md` — full usage guide
+
 ## v3.1.0 — Built-in Discount Codes
 
 ### Added

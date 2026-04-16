@@ -7,6 +7,7 @@ use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\Gateways\FanbasisGateway;
 use Subtain\LaravelPayments\Gateways\Match2PayGateway;
 use Subtain\LaravelPayments\Gateways\PremiumPayGateway;
+use Subtain\LaravelPayments\Gateways\RebornpayGateway;
 
 /**
  * Payment gateway manager — uses Laravel's Manager pattern.
@@ -64,6 +65,16 @@ class PaymentManager extends Manager
         $config = $this->config->get('payments.gateways.match2pay', []);
 
         return new Match2PayGateway($config);
+    }
+
+    /**
+     * Create the Rebornpay gateway driver.
+     */
+    protected function createRebornpayDriver(): RebornpayGateway
+    {
+        $config = $this->config->get('payments.gateways.rebornpay', []);
+
+        return new RebornpayGateway($config);
     }
 
     /**
