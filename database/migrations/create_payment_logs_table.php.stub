@@ -28,11 +28,24 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Indexes
-            $table->index('gateway');
-            $table->index('event');
-            $table->index('payment_id');
-            $table->index('created_at');
+            // ── Indexes ──────────────────────────────────────────────────────────
+            //
+            // Composite indexes matched to reporting query patterns.
+            // Single-column indexes on gateway/event/created_at have been replaced
+            // because every report filters on 2-3 columns simultaneously.
+
+            // GatewayReport::webhookReliability() — GROUP BY gateway, COUNT by event, filter created_at
+            $table->index(['gateway', 'event', 'created_at'], 'lp_logs_gateway_event_created');
+
+            // WebhookAuditReport::duplicateWebhooks() — filter payment_id + event, then join
+            $table->index(['payment_id', 'event'], 'lp_logs_payment_event');
+
+            // WebhookAuditReport::unmatchedWebhooks() — filter payment_id IS NULL + event
+            // Partial index not portable; use (event, payment_id) — MySQL will use it for IS NULL too
+            $table->index(['event', 'payment_id', 'created_at'], 'lp_logs_event_payment_created');
+
+            // WebhookAuditReport::sandboxVsReal() — filter is_sandbox, optionally created_at
+            $table->index(['is_sandbox', 'created_at'], 'lp_logs_sandbox_created');
         });
     }
 

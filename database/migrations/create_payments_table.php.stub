@@ -26,6 +26,7 @@ return new class extends Migration
             // Status
             $table->string('status')->default('pending');       // pending, processing, paid, failed, cancelled, refunded
             $table->timestamp('paid_at')->nullable();
+            $table->timestamp('refunded_at')->nullable();       // Stamped when status transitions to refunded
 
             // Customer
             $table->string('customer_email')->nullable();
@@ -49,7 +50,7 @@ return new class extends Migration
                 ->constrained(config('lp_payments.tables.discount_codes', 'lp_discount_codes'))
                 ->nullOnDelete();
             $table->decimal('discount_amount', 12, 2)->nullable(); // how much was discounted
-            $table->unsignedBigInteger('user_id')->nullable()->index(); // who made the payment (for per-user discount limits)
+            $table->unsignedBigInteger('user_id')->nullable();  // who made the payment (for per-user discount limits)
 
             // Sandbox flag — true when this payment was simulated (no real charge made)
             $table->boolean('is_sandbox')->default(false);
@@ -60,11 +61,41 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Indexes
-            $table->index('gateway');
-            $table->index('status');
-            $table->index('customer_email');
-            $table->index('created_at');
+            // ── Indexes ──────────────────────────────────────────────────────────
+            //
+            // All single-column indexes have been replaced with composite indexes
+            // that match the exact query patterns used by the reporting layer.
+            // Composite index column order is: (most-filtered → group/sort).
+            //
+            // Rule: an index covers a query when every WHERE column comes first,
+            // then GROUP BY / ORDER BY columns follow in the same index.
+
+            // Revenue, conversion, gateway reports — filter by status+created_at (most common pattern)
+            $table->index(['status', 'created_at'], 'lp_pay_status_created');
+
+            // Revenue, gateway — filter gateway+status, then aggregate or order by created_at
+            $table->index(['gateway', 'status', 'created_at'], 'lp_pay_gateway_status_created');
+
+            // Sandbox filter + status + date — sandboxVsReal, excludeSandbox in every report
+            $table->index(['is_sandbox', 'status', 'created_at'], 'lp_pay_sandbox_status_created');
+
+            // Customer reports — group by customer_email after filtering status
+            $table->index(['customer_email', 'status'], 'lp_pay_email_status');
+
+            // Discount reports — filter discount_code_id + status + date
+            $table->index(['discount_code_id', 'status', 'created_at'], 'lp_pay_discount_status_created');
+
+            // Payable-type reports — group by payable_type after filtering status
+            $table->index(['payable_type', 'status', 'created_at'], 'lp_pay_payable_status_created');
+
+            // User-scoped reports — filter user_id + status
+            $table->index(['user_id', 'status'], 'lp_pay_user_status');
+
+            // Key-rotation audit — filter key_fingerprint + gateway
+            $table->index(['key_fingerprint', 'gateway'], 'lp_pay_fingerprint_gateway');
+
+            // paid_at — used for retention signals, checkout-to-paid latency
+            $table->index('paid_at', 'lp_pay_paid_at');
         });
     }
 

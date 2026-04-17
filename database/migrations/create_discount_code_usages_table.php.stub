@@ -28,7 +28,9 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
 
             // Indexes
-            $table->index('discount_code_id');
+            // Composite: discount_code_id + user_id — used by idempotency guard in WebhookController
+            // and DiscountReport::perCodePerformance() join
+            $table->index(['discount_code_id', 'user_id'], 'lp_disc_usage_code_user');
         });
     }
 

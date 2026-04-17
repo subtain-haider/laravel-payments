@@ -18,6 +18,7 @@ class Payment extends Model
         'discount_amount'  => 'float',
         'metadata'         => 'array',
         'paid_at'          => 'datetime',
+        'refunded_at'      => 'datetime',
         'is_sandbox'       => 'boolean',
         'key_fingerprint'  => 'string',  // first4****last4 of the gateway API key active at payment time
     ];
@@ -122,6 +123,8 @@ class Payment extends Model
      */
     public function markAsRefunded(): self
     {
+        $this->refunded_at = now();
+
         return $this->transitionTo(PaymentStatus::REFUNDED);
     }
 
