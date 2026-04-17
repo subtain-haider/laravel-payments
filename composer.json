@@ -51,7 +51,8 @@
                 "Subtain\\LaravelPayments\\PaymentServiceProvider"
             ],
             "aliases": {
-                "Payment": "Subtain\\LaravelPayments\\Facades\\Payment"
+                "Payment": "Subtain\\LaravelPayments\\Facades\\Payment",
+                "PaymentReports": "Subtain\\LaravelPayments\\Facades\\PaymentReports"
             }
         }
     },

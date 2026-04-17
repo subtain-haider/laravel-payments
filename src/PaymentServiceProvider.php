@@ -7,6 +7,7 @@ use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\Gateways\Fanbasis\FanbasisClient;
 use Subtain\LaravelPayments\Gateways\Match2Pay\Match2PayClient;
 use Subtain\LaravelPayments\Gateways\Rebornpay\RebornpayClient;
+use Subtain\LaravelPayments\Reporting\ReportingManager;
 
 class PaymentServiceProvider extends ServiceProvider
 {
@@ -23,6 +24,8 @@ class PaymentServiceProvider extends ServiceProvider
             return new PaymentManager($app);
         });
 
+        $this->app->alias('payment.reports', ReportingManager::class);
+
         $this->app->bind(PaymentGateway::class, function ($app) {
             return $app->make('payment')->gateway();
         });
@@ -30,6 +33,11 @@ class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(SandboxResolver::class);
         $this->app->singleton(PaymentService::class);
         $this->app->singleton(DiscountService::class);
+
+        // Reporting — completely isolated from payment processing
+        $this->app->singleton('payment.reports', function () {
+            return new ReportingManager();
+        });
 
         // Register FanbasisClient as a singleton for direct DI usage
         $this->app->singleton(FanbasisClient::class, function ($app) {
