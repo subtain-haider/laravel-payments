@@ -127,7 +127,7 @@ class Match2PayClient
     {
         return Http::baseUrl($this->baseUrl)
             ->timeout($this->timeout)
-            ->retry($this->retries, 500, fn (\Throwable $e, \Illuminate\Http\Client\Response $response) => $response->status() === 429 || $response->serverError(), throw: false)
+            ->retry($this->retries, 500, fn (\Throwable $e, \Illuminate\Http\Client\PendingRequest $request) => $e instanceof \Illuminate\Http\Client\RequestException && ($e->response->status() === 429 || $e->response->serverError()), throw: false)
             ->withHeaders(['Content-Type' => 'application/json'])
             ->asJson()
             ->acceptJson();
