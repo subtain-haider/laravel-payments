@@ -9,6 +9,7 @@
         "premiumpay",
         "match2pay",
         "rebornpay",
+        "fxpay",
         "upi",
         "checkout",
         "webhooks"

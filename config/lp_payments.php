@@ -119,6 +119,17 @@ return [
             'key_fields' => ['api_key', 'postback_key'],
         ],
 
+        'fxpay' => [
+            'driver'         => \Subtain\LaravelPayments\Gateways\FxpayGateway::class,
+            'base_url'       => env('FXPAY_BASE_URL', 'https://fxpay.live'),
+            'api_secret'     => env('FXPAY_API_SECRET'),
+            'webhook_secret' => env('FXPAY_WEBHOOK_SECRET'),
+            'timeout'        => (int) env('FXPAY_TIMEOUT', 30),
+            'retries'        => (int) env('FXPAY_RETRIES', 2),
+            // Fields treated as authentication credentials for key fingerprinting.
+            'key_fields'     => ['api_secret', 'webhook_secret'],
+        ],
+
     ],
 
     /*

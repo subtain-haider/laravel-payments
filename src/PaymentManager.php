@@ -5,6 +5,7 @@ namespace Subtain\LaravelPayments;
 use Illuminate\Support\Manager;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\Gateways\FanbasisGateway;
+use Subtain\LaravelPayments\Gateways\FxpayGateway;
 use Subtain\LaravelPayments\Gateways\Match2PayGateway;
 use Subtain\LaravelPayments\Gateways\PremiumPayGateway;
 use Subtain\LaravelPayments\Gateways\RebornpayGateway;
@@ -75,6 +76,16 @@ class PaymentManager extends Manager
         $config = $this->config->get('lp_payments.gateways.rebornpay', []);
 
         return new RebornpayGateway($config);
+    }
+
+    /**
+     * Create the FxPay gateway driver.
+     */
+    protected function createFxpayDriver(): FxpayGateway
+    {
+        $config = $this->config->get('lp_payments.gateways.fxpay', []);
+
+        return new FxpayGateway($config);
     }
 
     /**

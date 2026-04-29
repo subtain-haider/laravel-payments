@@ -5,6 +5,7 @@ namespace Subtain\LaravelPayments;
 use Illuminate\Support\ServiceProvider;
 use Subtain\LaravelPayments\Contracts\PaymentGateway;
 use Subtain\LaravelPayments\Gateways\Fanbasis\FanbasisClient;
+use Subtain\LaravelPayments\Gateways\Fxpay\FxpayClient;
 use Subtain\LaravelPayments\Gateways\Match2Pay\Match2PayClient;
 use Subtain\LaravelPayments\Gateways\Rebornpay\RebornpayClient;
 use Subtain\LaravelPayments\Reporting\ReportingManager;
@@ -58,6 +59,13 @@ class PaymentServiceProvider extends ServiceProvider
             $config = $app['config']->get('lp_payments.gateways.match2pay', []);
 
             return new Match2PayClient($config);
+        });
+
+        // Register FxpayClient as a singleton for direct DI usage
+        $this->app->singleton(FxpayClient::class, function ($app) {
+            $config = $app['config']->get('lp_payments.gateways.fxpay', []);
+
+            return new FxpayClient($config);
         });
     }
 

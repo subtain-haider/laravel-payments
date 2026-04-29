@@ -1,5 +1,48 @@
 # Changelog
 
+## v5.2.0 — FxPay Gateway
+
+### Added
+
+- **`FxpayGateway`** — New built-in gateway for Indian UPI payments via the [FxPay](https://fxpay.live) API. A second UPI provider alongside Rebornpay, using a simpler single-endpoint order model.
+
+- **`FxpayClient`** — Low-level HTTP client for the FxPay API. Uses `Authorization: Bearer` token authentication, structured `PaymentLogger` logging for every request/response cycle, and retry logic on 429/5xx responses.
+
+- **`OrderService`** — Single-responsibility service wrapping `POST /api/v1/orders`. Accepts customer details, amount, `merchant_order_id` (your `invoiceId`), and `callback_url` (your webhook URL).
+
+- **`FxpayGateway::verifyWebhookSignature()`** — HMAC-SHA256 verification using the raw request body against the `X-PG-Signature` header (`X-Webhook-Signature` accepted as fallback). Raw body method ensures signature accuracy — consistent with Fanbasis.
+
+- **Config entry** — `config/lp_payments.php` now includes a `fxpay` gateway block with `base_url`, `api_secret`, `webhook_secret`, `timeout`, `retries`, and `key_fields` for key fingerprinting.
+
+- **`FxpayClient` singleton** — Registered in `PaymentServiceProvider` for direct DI injection, consistent with all other built-in clients.
+
+- **`docs/gateways/fxpay.md`** — Full gateway documentation: setup, checkout, webhook handling, signature verification, discount integration, sandbox usage, and direct API access.
+
+### Status mapping
+
+| FxPay `data.status` | Package status |
+|---|---|
+| `success` | `PAID` |
+| `rejected` | `FAILED` |
+| anything else | `PENDING` |
+
+### Non-breaking
+
+- No existing gateway, migration, event, or model was modified.
+- No new migrations required — FxPay uses the same `lp_payments` / `lp_payment_logs` tables as all other gateways.
+- Discounts, sandbox mode, key fingerprinting, and all package events work identically for FxPay without any extra configuration.
+
+### Upgrade
+
+No action required for existing installs. Add credentials to `.env` and start using:
+
+```env
+FXPAY_API_SECRET=sk_xxxxxxxxx
+FXPAY_WEBHOOK_SECRET=secret_xxxxxxxxxx
+```
+
+---
+
 ## v4.2.0 — API Key Fingerprinting
 
 ### Added
