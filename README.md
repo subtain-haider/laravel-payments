@@ -9,7 +9,7 @@ A unified, production-ready payment SDK for Laravel. Write your checkout and web
 
 ## Features
 
-- **4 production-ready gateways** — Fanbasis, Match2Pay (crypto), Rebornpay (UPI/India), PremiumPay
+- **5 production-ready gateways** — Fanbasis, Match2Pay (crypto), Rebornpay (UPI/India), FxPay (UPI/India), PremiumPay
 - **Payment records** — full DB tracking with polymorphic ownership, status machine, and audit trail
 - **Automatic webhook handling** — signature verification, status transitions, event dispatch for every gateway
 - **Discount codes** — gateway-agnostic, auto-applied and auto-recorded on webhook confirmation
@@ -27,6 +27,7 @@ A unified, production-ready payment SDK for Laravel. Write your checkout and web
 | **Fanbasis** | Cards, MoR | One-time, Subscriptions, Embedded, Static | 12 event types, HMAC-SHA256 | Customers, Subscribers, Discount Codes, Products, Transactions, Refunds, Webhooks | [→](docs/gateways/fanbasis.md) |
 | **Match2Pay** | Crypto (USDT, BTC, ETH, BNB, 40+) | API checkout, 2-step selection | SHA-384 (DONE only) | Deposits, Withdrawals | [→](docs/gateways/match2pay.md) |
 | **Rebornpay** | UPI / IMPS (India) | API checkout | MD5 + Python-repr | Pay-in, Status checks, UTR storage | [→](docs/gateways/rebornpay.md) |
+| **FxPay** | UPI (India) | API checkout | HMAC-SHA256 raw body | Orders | [→](docs/gateways/fxpay.md) |
 | **PremiumPay** | Cards | API checkout | Callback-based | Checkout only | See below |
 | **Your gateway** | Any | Implement interface | Your logic | Your logic | [→ Custom gateways](docs/custom-gateways.md) |
 
@@ -45,6 +46,7 @@ A unified, production-ready payment SDK for Laravel. Write your checkout and web
 | **[Fanbasis](docs/gateways/fanbasis.md)** | All checkout modes, full API suite, webhook event reference |
 | **[Match2Pay](docs/gateways/match2pay.md)** | Crypto checkout, cryptocurrency reference, withdrawal API, wallet expiry |
 | **[Rebornpay](docs/gateways/rebornpay.md)** | UPI/IMPS, INR conversion, status checks, UTR storage, signature verification |
+| **[FxPay](docs/gateways/fxpay.md)** | UPI checkout, HMAC-SHA256 webhook signature, discount & sandbox support |
 
 ---
 
@@ -181,6 +183,21 @@ Payment::gateway('rebornpay')->checkout(new CheckoutRequest(
 ```
 
 **[→ Full Rebornpay documentation](docs/gateways/rebornpay.md)**
+
+### FxPay (UPI — India)
+
+```php
+Payment::gateway('fxpay')->checkout(new CheckoutRequest(
+    amount:        1500.50,
+    invoiceId:     'order_123',
+    customerName:  'Rahul Sharma',
+    customerEmail: 'rahul@example.com',
+    webhookUrl:    route('payments.webhook', 'fxpay'),
+    productName:   'Challenge Purchase',
+));
+```
+
+**[→ Full FxPay documentation](docs/gateways/fxpay.md)**
 
 ### PremiumPay
 
