@@ -294,7 +294,7 @@ class FanbasisGateway implements PaymentGateway
 
         return new WebhookResult(
             status: $this->resolveStatusFromEvent($eventType, $payload),
-            invoiceId: $apiMetadata['invoice_id'] ?? '',
+            invoiceId: $apiMetadata['invoice_id'] ?? $apiMetadata['order_id'] ?? '',
             transactionId: $payload['payment_id'] ?? (string) ($payload['checkout_session_id'] ?? ''),
             gateway: $this->name(),
             amount: (float) ($payload['amount'] ?? $payload['product_price'] ?? 0),
@@ -345,10 +345,20 @@ class FanbasisGateway implements PaymentGateway
 
         if (is_string($raw)) {
             $decoded = json_decode($raw, true);
-            return is_array($decoded) ? $decoded : [];
+            $raw = is_array($decoded) ? $decoded : [];
         }
 
-        return is_array($raw) ? $raw : [];
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        // Fanbasis checkout-session webhooks wrap api_metadata in an extra {'data': {...}} envelope.
+        // Unwrap it so order_id / invoice_id are always at the top level.
+        if (isset($raw['data']) && is_array($raw['data']) && count($raw) === 1) {
+            $raw = $raw['data'];
+        }
+
+        return $raw;
     }
 
     // ── Status Resolution ───────────────────────────────────
