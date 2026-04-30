@@ -87,8 +87,16 @@ class FanbasisGateway implements PaymentGateway
      */
     public function parseWebhook(array $payload): WebhookResult
     {
-        // Envelope format (dispute.*, refund.*) — unwrap the data
+        // Envelope format: { id, type, data: {...}, created_at }
         if (isset($payload['type']) && isset($payload['data']) && is_array($payload['data'])) {
+            $type = $payload['type'];
+
+            // payment.* and product.* envelopes carry a flat payment event inside data — parse as flat.
+            if (str_starts_with($type, 'payment.') || str_starts_with($type, 'product.')) {
+                return $this->parseFlatWebhook($payload['data']);
+            }
+
+            // dispute.* and refund.* use the envelope parser.
             return $this->parseEnvelopeWebhook($payload);
         }
 
