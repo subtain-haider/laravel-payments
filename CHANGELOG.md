@@ -1,5 +1,23 @@
 # Changelog
 
+## v5.2.6 — Underpayment guard + received_amount tracking
+
+### Added
+
+- **`lp_payments.received_amount`** — New nullable column (migration stub: `add_received_amount_to_payments_table.php.stub`). Stores the gateway-confirmed amount from the PAID webhook. For crypto gateways (Match2Pay) this is `finalAmount` in the account currency after conversion. For fixed-amount gateways (Fanbasis) it equals the original `amount`. `NULL` until a PAID webhook is processed.
+
+- **`underpayment_tolerance` gateway config key** — Per-gateway float (e.g. `0.02` = 2%). When set, `WebhookController` compares `received_amount` against `payment.amount * (1 - tolerance)`. If the received amount falls below this threshold, a `underpayment_detected` log event is written and `PaymentSucceeded` is **not** fired — preventing account grants for partial crypto payments. Gateways without this key are unaffected.
+
+- **`underpayment_detected` webhook log event** — Written to `lp_payment_logs` with `status=rejected` when an underpayment is blocked. Full payload and headers preserved for audit.
+
+### Impact
+
+- Match2Pay is the only gateway with `underpayment_tolerance` configured (0.02). All other gateways are completely unaffected.
+- Existing payments are unaffected — `received_amount` is `NULL` for historical records.
+- No breaking changes. Migration required: `add_received_amount_to_payments_table.php.stub`.
+
+---
+
 ## v5.2.5 — Bug fixes: discount userId propagation + Match2Pay txid placement
 
 ### Fixed

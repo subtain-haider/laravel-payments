@@ -105,6 +105,10 @@ return [
             'retries'   => (int) env('MATCH2PAY_RETRIES', 2),
             // Fields treated as authentication credentials for key fingerprinting.
             'key_fields' => ['api_token', 'secret'],
+            // Underpayment tolerance for crypto gateways.
+            // 0.02 = allow up to 2% below order amount (crypto FX rounding).
+            // null = no tolerance check (gateway always sends exact amount).
+            'underpayment_tolerance' => 0.02,
         ],
 
         'rebornpay' => [

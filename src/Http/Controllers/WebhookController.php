@@ -79,9 +79,17 @@ class WebhookController extends Controller
             status: $result->status->value,
         );
 
-        // Update payment status (with guard rails)
+        // Update payment status (with guard rails) and record received_amount
         if ($payment) {
             $this->updatePaymentStatus($payment, $result->status, $result->transactionId);
+
+            // Always persist the gateway-confirmed amount on the payment record for auditability.
+            // For crypto gateways this is finalAmount in the account currency (e.g. USD after conversion).
+            // For fixed-amount gateways it equals the original charged amount.
+            if ($result->isSuccessful() && $result->amount > 0) {
+                $payment->received_amount = $result->amount;
+                $payment->save();
+            }
         }
 
         // Always dispatch the generic event (includes payment model if found)
@@ -89,6 +97,23 @@ class WebhookController extends Controller
 
         // Dispatch status-specific events
         if ($result->isSuccessful()) {
+            // Underpayment guard — only for gateways that declare an underpayment_tolerance.
+            // Crypto gateways (Match2Pay) send whatever the blockchain confirmed, which may be
+            // slightly below the order amount due to FX conversion. A configured tolerance
+            // allows small shortfalls while blocking genuine underpayments.
+            if ($payment && ! $this->passesUnderpaymentCheck($gateway, $payment, $result->amount)) {
+                PaymentLog::logWebhook(
+                    paymentId: $payment->id,
+                    gateway:   $gateway,
+                    event:     'underpayment_detected',
+                    payload:   $payload,
+                    headers:   $headers,
+                    status:    'rejected',
+                );
+
+                return response()->json(['status' => 'ok']);
+            }
+
             PaymentSucceeded::dispatch($result, $payment);
 
             // Auto-record discount usage when enabled in config.
@@ -153,6 +178,31 @@ class WebhookController extends Controller
         }
 
         $usage->save();
+    }
+
+    /**
+     * Check whether the amount received from the gateway meets the expected order amount.
+     *
+     * Only applies when the gateway config declares an 'underpayment_tolerance'.
+     * A tolerance of 0.02 means we accept up to 2% below the order amount — this
+     * covers crypto-to-fiat FX rounding on gateways like Match2Pay.
+     *
+     * Gateways without 'underpayment_tolerance' in config always pass this check.
+     *
+     * Returns true  → safe to fire PaymentSucceeded
+     * Returns false → underpayment detected, block PaymentSucceeded
+     */
+    protected function passesUnderpaymentCheck(string $gateway, PaymentModel $payment, float $receivedAmount): bool
+    {
+        $tolerance = config("lp_payments.gateways.{$gateway}.underpayment_tolerance");
+
+        if ($tolerance === null) {
+            return true;
+        }
+
+        $requiredAmount = (float) $payment->amount * (1 - (float) $tolerance);
+
+        return $receivedAmount >= $requiredAmount;
     }
 
     /**

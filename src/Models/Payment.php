@@ -15,6 +15,7 @@ class Payment extends Model
     protected $casts = [
         'status'           => PaymentStatus::class,
         'amount'           => 'float',
+        'received_amount'  => 'float',
         'discount_amount'  => 'float',
         'metadata'         => 'array',
         'paid_at'          => 'datetime',
