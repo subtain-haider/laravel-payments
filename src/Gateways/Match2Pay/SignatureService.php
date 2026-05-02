@@ -105,10 +105,24 @@ class SignatureService
             return false;
         }
 
-        $formattedAmount = self::formatAmount($transactionAmount);
+        $formattedAmount = self::formatCallbackAmount($transactionAmount);
         $expected        = hash('sha384', $formattedAmount . $transactionCurrency . $status . $apiToken . $apiSecret);
 
         return hash_equals($expected, strtolower($receivedSignature));
+    }
+
+    /**
+     * Format an amount for callback signature verification.
+     *
+     * Per Match2Pay docs, the callback signature algorithm requires the amount
+     * to ALWAYS have exactly 8 decimal places (e.g. 36 → "36.00000000",
+     * 1 → "1.00000000"). Trailing zeros must NOT be stripped here.
+     *
+     * This is different from the outbound request signature which strips zeros.
+     */
+    public static function formatCallbackAmount(mixed $amount): string
+    {
+        return number_format((float) $amount, 8, '.', '');
     }
 
     /**
