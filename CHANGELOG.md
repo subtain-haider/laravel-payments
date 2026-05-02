@@ -1,5 +1,23 @@
 # Changelog
 
+## v5.2.5 — Bug fixes: discount userId propagation + Match2Pay txid placement
+
+### Fixed
+
+- **`PaymentService::initiate()` — `userId` and `discountCode` not carried over on CheckoutRequest rebuild** — When a discount code was applied, `initiate()` rebuilt the `CheckoutRequest` with the discounted amount but omitted `userId` and `discountCode`. This caused `lp_payments.user_id` to be stored as `NULL`, which in turn wrote `NULL` into `lp_discount_code_usages.user_id`, breaking the per-user discount usage audit trail and making `max_uses_per_user` enforcement ineffective. Fix: both fields are now forwarded in the rebuilt request.
+
+- **`Match2PayGateway::parseWebhook()` — blockchain `txid` used as `transactionId` instead of payment ID** — `transactionId` on the `WebhookResult` was being set to the crypto `txid` from `cryptoTransactionInfo[0].txid`. This is a blockchain hash, not a Match2Pay payment identifier, and caused payment lookups by `transaction_id` to fail. Fix: `transactionId` is now set to the Match2Pay `paymentId` (the correct identifier). The blockchain `txid` is preserved in `WebhookResult::$metadata['blockchain_txid']` for full auditability.
+
+### Impact
+
+- `lp_payments.user_id` is now correctly populated on all discount-code orders.
+- `lp_discount_code_usages.user_id` is now correctly populated, enabling `max_uses_per_user` enforcement.
+- Match2Pay payment lookups by `transaction_id` now correctly resolve to the payment record.
+- Blockchain `txid` is still accessible via `$event->result->metadata['blockchain_txid']`.
+- No migrations required. No breaking changes.
+
+---
+
 ## v5.2.0 — FxPay Gateway
 
 ### Added

@@ -188,7 +188,7 @@ class Match2PayGateway implements PaymentGateway
         return new WebhookResult(
             status:        $status,
             invoiceId:     $paymentId,
-            transactionId: (string) ($payload['cryptoTransactionInfo'][0]['txid'] ?? $paymentId),
+            transactionId: $paymentId,
             gateway:       $this->name(),
             amount:        $finalAmount,
             currency:      $finalCurrency,
@@ -200,6 +200,7 @@ class Match2PayGateway implements PaymentGateway
                 'processing_fee'         => $payload['processingFee'] ?? null,
                 'conversion_rate'        => $payload['conversionRate'] ?? null,
                 'crypto_transaction_info' => $payload['cryptoTransactionInfo'] ?? null,
+                'blockchain_txid'        => (string) ($payload['cryptoTransactionInfo'][0]['txid'] ?? null),
             ],
             raw: $payload,
         );

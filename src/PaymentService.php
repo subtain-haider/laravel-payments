@@ -89,6 +89,8 @@ class PaymentService
                 webhookUrl:         $request->webhookUrl,
                 metadata:           $request->metadata,
                 extra:              $request->extra,
+                discountCode:       $request->discountCode,
+                userId:             $request->userId,
             );
         }
 
