@@ -130,6 +130,10 @@ return [
             'webhook_secret' => env('FXPAY_WEBHOOK_SECRET'),
             'timeout'        => (int) env('FXPAY_TIMEOUT', 30),
             'retries'        => (int) env('FXPAY_RETRIES', 2),
+            // USD → INR conversion rate applied before sending amount to FxPay.
+            // FxPay only accepts INR — all order amounts are in USD and must be converted.
+            // Update FXPAY_USD_INR_RATE in .env when the rate changes significantly.
+            'usd_inr_rate'   => (float) env('FXPAY_USD_INR_RATE', 93),
             // Fields treated as authentication credentials for key fingerprinting.
             'key_fields'     => ['api_secret', 'webhook_secret'],
         ],

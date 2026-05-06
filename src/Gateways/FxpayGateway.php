@@ -90,9 +90,14 @@ class FxpayGateway implements PaymentGateway
             );
         }
 
+        // FxPay only accepts INR. All platform prices are in USD — convert before sending.
+        // Rate is configurable via FXPAY_USD_INR_RATE env variable (default 93).
+        $usdInrRate  = (float) config('lp_payments.gateways.fxpay.usd_inr_rate', 93);
+        $amountInInr = round($request->amount * $usdInrRate, 2);
+
         $payload = [
             'customer'          => $this->buildCustomer($request),
-            'amount'            => $request->amount,
+            'amount'            => $amountInInr,
             'merchant_order_id' => $request->invoiceId,
             'callback_url'      => $request->webhookUrl,
         ];
@@ -103,7 +108,9 @@ class FxpayGateway implements PaymentGateway
 
         PaymentLogger::info('checkout.initiated', [
             'invoice_id'        => $request->invoiceId,
-            'amount'            => $request->amount,
+            'amount_usd'        => $request->amount,
+            'amount_inr'        => $amountInInr,
+            'usd_inr_rate'      => $usdInrRate,
             'merchant_order_id' => $request->invoiceId,
             'customer_email'    => $request->customerEmail,
         ], gateway: 'fxpay', category: 'checkout');
