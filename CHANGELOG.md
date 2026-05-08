@@ -1,5 +1,56 @@
 # Changelog
 
+## v5.2.8 — Whop Gateway
+
+### Added
+
+- **`WhopGateway`** — New built-in gateway for one-time and recurring (subscription) payments via [Whop](https://whop.com)'s hosted checkout. Supports 195 countries, 100+ payment methods, and automatic subscription billing.
+
+- **`WhopClient`** — Low-level HTTP client for `api.whop.com/v5`. Bearer token authentication, GET/POST/PATCH/DELETE, structured `PaymentLogger` logging on every request/response cycle, and automatic retry on 429/5xx responses.
+
+- **Subscription support** — Pass `extra['plan_type'] = 'renewal'` with `extra['billing_period']` (days) to create a recurring plan inline. Supports trial periods (`extra['trial_period_days']`), different renewal prices (`extra['renewal_price']`), and pre-existing plan IDs (`extra['plan_id']`) for dashboard-managed plans.
+
+- **Standard Webhooks signature verification** — Implements the [Standard Webhooks](https://www.standardwebhooks.com) spec: HMAC-SHA256 over `"{webhook-id}.{webhook-timestamp}.{raw_body}"` using the base64-decoded webhook secret. Includes 5-minute replay protection and multi-signature key rotation support. Use `verifyWebhookSignature(string $rawBody, array $headers)` for byte-accurate verification.
+
+- **Full subscription lifecycle event mapping** — All cancellation, failure, and renewal scenarios are handled:
+
+  | Whop Event | Package Status | Notes |
+  |---|---|---|
+  | `payment.succeeded` | `PAID` | |
+  | `payment.failed` | `FAILED` | Per retry attempt — do not revoke access yet |
+  | `payment.pending` | `PENDING` | |
+  | `payment.refunded` / `refund.created` | `REFUNDED` | |
+  | `membership.activated` | `PAID` | Initial start + every successful renewal |
+  | `membership.deactivated` | `CANCELLED` | All termination causes: user cancelled (period ended), all retries exhausted, admin revoked, plan expired |
+  | `membership.cancel_at_period_end_changed` | `PENDING` | User scheduled cancellation — still active, do not revoke |
+  | `dispute.created` | `FAILED` | Chargeback opened |
+
+- **Config entry** — `config/lp_payments.php` now includes a `whop` gateway block with `base_url`, `api_key`, `webhook_secret`, `company_id`, `timeout`, `retries`, and `key_fields` for key fingerprinting.
+
+- **`WhopClient` singleton** — Registered in `PaymentServiceProvider` for direct DI injection, consistent with all other built-in clients.
+
+- **`createWhopDriver()`** — Added to `PaymentManager` so `Payment::gateway('whop')` resolves correctly.
+
+- **`docs/gateways/whop.md`** — Full gateway documentation: setup, one-time checkout, subscription checkout (trial, different renewal price, existing plan ID), `extra[]` parameter reference, webhook event table, two-stage cancellation flow, failed renewal retry behaviour, signature verification, invoice ID round-trip, direct client access, and sandbox usage.
+
+### Non-breaking
+
+- No existing gateway, migration, event, or model was modified.
+- No new migrations required — Whop uses the same `lp_payments` / `lp_payment_logs` tables as all other gateways.
+- Discounts, sandbox mode, key fingerprinting, and all package events work identically for Whop without any extra configuration.
+
+### Upgrade
+
+No action required for existing installs. Add credentials to `.env` and start using:
+
+```env
+WHOP_API_KEY=your-company-api-key
+WHOP_WEBHOOK_SECRET=your-webhook-signing-secret
+WHOP_COMPANY_ID=biz_xxxxxxxxxxxxx
+```
+
+---
+
 ## v5.2.6 — Underpayment guard + received_amount tracking
 
 ### Added

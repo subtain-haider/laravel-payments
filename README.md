@@ -9,7 +9,7 @@ A unified, production-ready payment SDK for Laravel. Write your checkout and web
 
 ## Features
 
-- **5 production-ready gateways** — Fanbasis, Match2Pay (crypto), Rebornpay (UPI/India), FxPay (UPI/India), PremiumPay
+- **6 production-ready gateways** — Fanbasis, Match2Pay (crypto), Rebornpay (UPI/India), FxPay (UPI/India), PremiumPay, Whop (one-time + subscriptions)
 - **Payment records** — full DB tracking with polymorphic ownership, status machine, and audit trail
 - **Automatic webhook handling** — signature verification, status transitions, event dispatch for every gateway
 - **Discount codes** — gateway-agnostic, auto-applied and auto-recorded on webhook confirmation
@@ -28,6 +28,7 @@ A unified, production-ready payment SDK for Laravel. Write your checkout and web
 | **Match2Pay** | Crypto (USDT, BTC, ETH, BNB, 40+) | API checkout, 2-step selection | SHA-384 (DONE only) | Deposits, Withdrawals | [→](docs/gateways/match2pay.md) |
 | **Rebornpay** | UPI / IMPS (India) | API checkout | MD5 + Python-repr | Pay-in, Status checks, UTR storage | [→](docs/gateways/rebornpay.md) |
 | **FxPay** | UPI (India) | API checkout | HMAC-SHA256 raw body | Orders | [→](docs/gateways/fxpay.md) |
+| **Whop** | Cards, PayPal, 100+ methods | One-time, Subscriptions, Trial periods | Standard Webhooks (HMAC-SHA256), full lifecycle | Checkout configurations, Memberships | [→](docs/gateways/whop.md) |
 | **PremiumPay** | Cards | API checkout | Callback-based | Checkout only | See below |
 | **Your gateway** | Any | Implement interface | Your logic | Your logic | [→ Custom gateways](docs/custom-gateways.md) |
 
@@ -47,6 +48,7 @@ A unified, production-ready payment SDK for Laravel. Write your checkout and web
 | **[Match2Pay](docs/gateways/match2pay.md)** | Crypto checkout, cryptocurrency reference, withdrawal API, wallet expiry |
 | **[Rebornpay](docs/gateways/rebornpay.md)** | UPI/IMPS, INR conversion, status checks, UTR storage, signature verification |
 | **[FxPay](docs/gateways/fxpay.md)** | UPI checkout, HMAC-SHA256 webhook signature, discount & sandbox support |
+| **[Whop](docs/gateways/whop.md)** | One-time + subscription checkout, Standard Webhooks signature, full lifecycle event mapping, direct client access |
 
 ---
 
@@ -198,6 +200,32 @@ Payment::gateway('fxpay')->checkout(new CheckoutRequest(
 ```
 
 **[→ Full FxPay documentation](docs/gateways/fxpay.md)**
+
+### Whop
+
+```php
+// One-time
+Payment::gateway('whop')->checkout(new CheckoutRequest(
+    amount:    299.00,
+    currency:  'USD',
+    invoiceId: 'order_123',
+    successUrl: 'https://app.com/success',
+));
+
+// Subscription
+Payment::gateway('whop')->checkout(new CheckoutRequest(
+    amount:     29.99,
+    currency:   'USD',
+    invoiceId:  'sub_order_456',
+    successUrl: 'https://app.com/subscription/activated',
+    extra: [
+        'plan_type'      => 'renewal',
+        'billing_period' => 30,   // every 30 days
+    ],
+));
+```
+
+**[→ Full Whop documentation](docs/gateways/whop.md)**
 
 ### PremiumPay
 

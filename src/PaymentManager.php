@@ -9,6 +9,7 @@ use Subtain\LaravelPayments\Gateways\FxpayGateway;
 use Subtain\LaravelPayments\Gateways\Match2PayGateway;
 use Subtain\LaravelPayments\Gateways\PremiumPayGateway;
 use Subtain\LaravelPayments\Gateways\RebornpayGateway;
+use Subtain\LaravelPayments\Gateways\WhopGateway;
 
 /**
  * Payment gateway manager — uses Laravel's Manager pattern.
@@ -86,6 +87,16 @@ class PaymentManager extends Manager
         $config = $this->config->get('lp_payments.gateways.fxpay', []);
 
         return new FxpayGateway($config);
+    }
+
+    /**
+     * Create the Whop gateway driver.
+     */
+    protected function createWhopDriver(): WhopGateway
+    {
+        $config = $this->config->get('lp_payments.gateways.whop', []);
+
+        return new WhopGateway($config);
     }
 
     /**

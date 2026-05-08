@@ -138,6 +138,22 @@ return [
             'key_fields'     => ['api_secret', 'webhook_secret'],
         ],
 
+        'whop' => [
+            'driver'         => \Subtain\LaravelPayments\Gateways\WhopGateway::class,
+            'base_url'       => env('WHOP_BASE_URL', 'https://api.whop.com/v5'),
+            // Company API key from Whop Dashboard → Settings → API Keys.
+            'api_key'        => env('WHOP_API_KEY'),
+            // Webhook signing secret from Whop Dashboard → Developer → Webhooks.
+            // Whop stores this base64-encoded — paste the value as-is from the dashboard.
+            'webhook_secret' => env('WHOP_WEBHOOK_SECRET'),
+            // Your Whop company ID (biz_xxx). Required for inline plan creation.
+            'company_id'     => env('WHOP_COMPANY_ID'),
+            'timeout'        => (int) env('WHOP_TIMEOUT', 30),
+            'retries'        => (int) env('WHOP_RETRIES', 2),
+            // Fields treated as authentication credentials for key fingerprinting.
+            'key_fields'     => ['api_key', 'webhook_secret'],
+        ],
+
     ],
 
     /*
