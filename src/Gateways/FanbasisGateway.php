@@ -168,7 +168,6 @@ class FanbasisGateway implements PaymentGateway
             'type'         => $request->extra['type'] ?? 'onetime_non_reusable',
             'metadata'     => $request->metadata,
             'success_url'  => $request->successUrl,
-            'webhook_url'  => $request->webhookUrl,
         ];
 
         if (isset($request->extra['application_fee'])) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## v5.2.10 — Fanbasis: remove webhook_url from checkout payload
+
+### Fixed
+
+- **`FanbasisGateway`** — Removed `webhook_url` from the `checkout-sessions` POST payload. Fanbasis now prohibits this field and returns a 400 validation error when present. Webhooks are delivered via account-level subscriptions (`POST /webhook-subscriptions`) — not per-session URLs.
+
 ## v5.2.8 — Whop Gateway
 
 ### Added
