@@ -65,7 +65,7 @@ class Payment extends Model
      */
     protected static array $transitions = [
         'pending'   => ['processing', 'paid', 'failed', 'cancelled'],
-        'processing'=> ['paid', 'failed', 'cancelled'],
+        'processing'=> ['pending', 'paid', 'failed', 'cancelled'],
         'paid'      => ['refunded'],
         'failed'    => ['pending'],  // retry
         'cancelled' => [],
