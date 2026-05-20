@@ -1,5 +1,11 @@
 # Changelog
 
+## v5.2.12 — SandboxGateway: fix constructor type error when selected by name
+
+### Fixed
+
+- **`SandboxGateway`** — Constructor now accepts `array|string $config` instead of `string $originalGateway`. When `PaymentManager::createDriver()` instantiates it as a named gateway (e.g. `gateway: 'sandbox'` in checkout), it passes the config array — this previously caused a `TypeError`. When `PaymentService` injects it transparently as a sandbox override, it still passes a string gateway name and continues to work as before. `originalGateway` defaults to `'sandbox'` in both code paths.
+
 ## v5.2.11 — SandboxGateway: append invoice_id to redirect URL
 
 ### Fixed

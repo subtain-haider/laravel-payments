@@ -36,9 +36,17 @@ class SandboxGateway implements PaymentGateway
      */
     private string $originalGateway;
 
-    public function __construct(string $originalGateway = 'sandbox')
+    /**
+     * Accepts either a config array (when resolved by PaymentManager::createDriver)
+     * or a plain string gateway name (when injected transparently by PaymentService).
+     *
+     * @param  array<string, mixed>|string  $config
+     */
+    public function __construct(array|string $config = 'sandbox')
     {
-        $this->originalGateway = $originalGateway;
+        $this->originalGateway = is_array($config)
+            ? ($config['original_gateway'] ?? 'sandbox')
+            : $config;
     }
 
     /**
