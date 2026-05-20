@@ -1,5 +1,11 @@
 # Changelog
 
+## v5.2.13 — PaymentService: fix named argument mismatch after SandboxGateway constructor rename
+
+### Fixed
+
+- **`PaymentService`** — Updated `new SandboxGateway(originalGateway: $gateway)` to `new SandboxGateway(config: $gateway)` to match the constructor parameter renamed in v5.2.12. Without this fix, PHP threw `Unknown named parameter $originalGateway` when `PaymentService` transparently intercepted a real gateway request in sandbox mode.
+
 ## v5.2.12 — SandboxGateway: fix constructor type error when selected by name
 
 ### Fixed

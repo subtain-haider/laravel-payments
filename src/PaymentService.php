@@ -180,7 +180,7 @@ class PaymentService
         }
 
         $gatewayDriver = $isSandbox
-            ? new SandboxGateway(originalGateway: $gateway)
+            ? new SandboxGateway(config: $gateway)
             : Payment::gateway($gateway);
 
         try {
