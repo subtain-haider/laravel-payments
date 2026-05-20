@@ -59,7 +59,9 @@ class SandboxGateway implements PaymentGateway
     public function checkout(CheckoutRequest $request): CheckoutResult
     {
         $transactionId = 'sandbox_' . $request->invoiceId . '_' . time();
-        $redirectUrl   = config('lp_payments.sandbox.redirect_url', '/sandbox/payment-pending');
+        $base          = config('lp_payments.sandbox.redirect_url', '/sandbox/payment-pending');
+        // Append invoice_id so the receiving page can call the sandbox confirm endpoint.
+        $redirectUrl   = $base . (str_contains($base, '?') ? '&' : '?') . 'invoice_id=' . $request->invoiceId;
 
         PaymentLogger::info('checkout.initiated', [
             'invoice_id'       => $request->invoiceId,

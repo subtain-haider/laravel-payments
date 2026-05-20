@@ -1,5 +1,11 @@
 # Changelog
 
+## v5.2.11 — SandboxGateway: append invoice_id to redirect URL
+
+### Fixed
+
+- **`SandboxGateway`** — `checkout()` now appends `?invoice_id={invoiceId}` to the configured `sandbox.redirect_url`. Previously the redirect URL was returned as-is, leaving the receiving page with no way to identify which payment to confirm via the sandbox confirm endpoint (`GET {webhook_path}/sandbox/confirm/{invoice_id}`). Existing base URLs that already contain a query string are handled correctly (`&invoice_id=` is appended instead of `?`).
+
 ## v5.2.10 — Fanbasis: remove webhook_url from checkout payload
 
 ### Fixed
