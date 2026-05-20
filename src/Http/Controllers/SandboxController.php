@@ -92,7 +92,7 @@ class SandboxController extends Controller
             'confirmed_by'   => 'sandbox_confirm_endpoint',
         ];
 
-        $gateway = new SandboxGateway(originalGateway: $payment->gateway);
+        $gateway = new SandboxGateway(config: $payment->gateway);
         $result  = $gateway->parseWebhook($syntheticPayload);
 
         // Log the simulated confirmation — flagged as sandbox

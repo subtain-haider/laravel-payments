@@ -1,5 +1,11 @@
 # Changelog
 
+## v5.2.14 — SandboxController: fix named argument mismatch after SandboxGateway constructor rename
+
+### Fixed
+
+- **`SandboxController`** — Updated `new SandboxGateway(originalGateway: ...)` to `new SandboxGateway(config: ...)` to match the constructor parameter renamed in v5.2.12. Same root cause as v5.2.13 but in the confirm endpoint controller.
+
 ## v5.2.13 — PaymentService: fix named argument mismatch after SandboxGateway constructor rename
 
 ### Fixed
