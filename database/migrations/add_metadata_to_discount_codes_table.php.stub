@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Addendum migration for existing installs upgrading to discount code metadata support.
+ *
+ * If you ran the original package migrations before the metadata column was added,
+ * publish and run this migration to add the metadata column to the discount_codes table:
+ *
+ *   php artisan vendor:publish --tag=payments-discount-codes-metadata-migration
+ *   php artisan migrate
+ *
+ * New installs do not need this — metadata is already in the base stub.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        $table = config('lp_payments.tables.discount_codes', 'lp_discount_codes');
+
+        if (Schema::hasTable($table) && ! Schema::hasColumn($table, 'metadata')) {
+            Schema::table($table, function (Blueprint $table) {
+                // Arbitrary app data (tags, internal notes, feature flags, etc.)
+                $table->json('metadata')->nullable()->after('gateways');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        $table = config('lp_payments.tables.discount_codes', 'lp_discount_codes');
+
+        Schema::table($table, function (Blueprint $table) {
+            $table->dropColumn('metadata');
+        });
+    }
+};

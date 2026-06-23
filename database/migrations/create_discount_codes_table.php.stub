@@ -32,6 +32,9 @@ return new class extends Migration
             // Gateway scoping (null = all gateways, e.g. ["fanbasis", "premiumpay"])
             $table->json('gateways')->nullable();
 
+            // Arbitrary app data (tags, internal notes, feature flags, etc.)
+            $table->json('metadata')->nullable();
+
             $table->boolean('active')->default(true);
 
             $table->timestamps();

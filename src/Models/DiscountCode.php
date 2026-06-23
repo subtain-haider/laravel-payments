@@ -24,6 +24,7 @@ class DiscountCode extends Model
         'starts_at'           => 'datetime',
         'expires_at'          => 'datetime',
         'gateways'            => 'array',
+        'metadata'            => 'array',
         'active'              => 'boolean',
     ];
 

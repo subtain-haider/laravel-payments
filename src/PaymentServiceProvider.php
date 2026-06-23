@@ -111,6 +111,12 @@ class PaymentServiceProvider extends ServiceProvider
                 => database_path('migrations/' . date('Y_m_d_His', time()) . '_add_key_fingerprint_to_payments_table.php'),
         ], 'payments-key-fingerprint-migration');
 
+        // Publish addendum migration (for existing installs upgrading to discount code metadata support)
+        $this->publishes([
+            __DIR__ . '/../database/migrations/add_metadata_to_discount_codes_table.php.stub'
+                => database_path('migrations/' . date('Y_m_d_His', time()) . '_add_metadata_to_discount_codes_table.php'),
+        ], 'payments-discount-codes-metadata-migration');
+
         // Load webhook routes
         $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');
     }
