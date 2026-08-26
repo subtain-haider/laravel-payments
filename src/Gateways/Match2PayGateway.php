@@ -36,9 +36,19 @@ use Subtain\LaravelPayments\Gateways\Match2Pay\WithdrawalService;
  * and is enforced by SignatureService::formatCustomer().
  *
  * ── Webhook (callback) flow ────────────────────────────────────────────────
- * Match2Pay sends two callbacks per transaction:
- *   1. PENDING — transaction appears in blockchain
- *   2. DONE    — funds confirmed and booked
+ * Match2Pay sends up to three callbacks per transaction:
+ *   1. PENDING        — transaction appears in blockchain (do NOT credit yet)
+ *   2. PARTIALLY_PAID — crypto confirmed on-chain but fiat conversion settled
+ *                       slightly below the invoice amount (treated as PAID here;
+ *                       the underpayment_tolerance guard in WebhookController
+ *                       decides whether to honour it or not)
+ *   3. DONE           — full fiat amount booked (also treated as PAID)
+ *
+ * Both PARTIALLY_PAID and DONE map to PaymentStatus::PAID so the
+ * underpayment tolerance in the host app is the single place that decides
+ * acceptability. When the host has already granted the account on
+ * PARTIALLY_PAID, the downstream idempotency guards (markPaid conditional
+ * UPDATE, CreateAccountGrant existence check) ensure DONE is a no-op.
  *
  * Per docs, signature verification should ONLY be performed for DONE status.
  * The signature arrives in the HTTP header (header name varies — check your
@@ -164,8 +174,11 @@ class Match2PayGateway implements PaymentGateway
      *
      * Status mapping:
      *   DONE                        → PaymentStatus::PAID
+     *   PARTIALLY_PAID              → PaymentStatus::PAID  (fiat settled slightly short;
+     *                                  underpayment_tolerance in WebhookController decides
+     *                                  whether to honour it — if already honoured, a later
+     *                                  DONE is a no-op via the order idempotency guard)
      *   DECLINED, FAIL, SUSPECTED   → PaymentStatus::FAILED
-     *   PARTIALLY_PAID              → PaymentStatus::FAILED (requires additional payment)
      *   everything else             → PaymentStatus::PENDING
      */
     public function parseWebhook(array $payload): WebhookResult
@@ -356,11 +369,18 @@ class Match2PayGateway implements PaymentGateway
     protected function mapStatus(string $status): PaymentStatus
     {
         return match (strtoupper($status)) {
-            'DONE'                      => PaymentStatus::PAID,
+            // Fully settled — fiat amount booked in full.
+            'DONE'                         => PaymentStatus::PAID,
+            // Crypto confirmed on-chain but fiat conversion settled slightly below
+            // the invoice amount. Treated as PAID so the host app's underpayment
+            // tolerance (underpayment_tolerance config) is the single decision point.
+            // If the shortfall is within tolerance → account granted. If a DONE
+            // follows later, downstream idempotency guards make it a no-op.
+            'PARTIALLY_PAID'               => PaymentStatus::PAID,
             'DECLINED', 'FAIL',
-            'SUSPECTED', 'PARTIALLY PAID' => PaymentStatus::FAILED,
-            'CANCELLED', 'CANCELED'     => PaymentStatus::CANCELLED,
-            default                     => PaymentStatus::PENDING,
+            'SUSPECTED'                    => PaymentStatus::FAILED,
+            'CANCELLED', 'CANCELED'        => PaymentStatus::CANCELLED,
+            default                        => PaymentStatus::PENDING,
         };
     }
 }
